@@ -1,4 +1,4 @@
-# AI Sidebar Suggestion App - 練習題最低架構
+# AI Sidebar Suggestion App - 練習題架構
 
 ## 題目
 
@@ -41,7 +41,8 @@
 
 ## 技術架構
 
-* 框架：React + Tailwind CSS + shadcn/ui
+* 框架：React 19 + TypeScript + Tailwind CSS + shadcn/ui
+* 路由：React Router v6 + 文件系統路由（類似 Next.js）
 * 組件
 
   * `<ReaderPage>`：主要閱讀頁面
@@ -57,11 +58,12 @@ User Event (Observer) → Controller → SuggestionFactory → Strategy.generate
 
 ---
 
-## 實作範圍（最低限）
+## 實作範圍（已完成）
 
-1. **Observer**
+1. **文件系統路由**
 
-   * 建一個 hook：`useReaderObserver()`，回傳 event stream (scroll / highlight / idle / click)
+   * 建置 `/pages` 目錄結構，自動生成路由
+   * 支援懶加載和 Suspense
 
 2. **Strategy interface**
 
@@ -86,58 +88,51 @@ User Event (Observer) → Controller → SuggestionFactory → Strategy.generate
 
 ---
 
-## 📁 Folder Structure (建議)
+## 📁 Folder Structure (實際架構)
 
 ```
-/src
-  /app
-    /reader
-      page.tsx          # folder-as-router 機制用的 main entry
-      layout.tsx        # optional, sidebar 用 layout
-      /components
-        AISidebar.tsx
-        SuggestionBubble.tsx
-        SuggestionCard.tsx
-      /hooks
-        useReaderObserver.ts
-      /controllers
-        ReaderController.ts
-      /strategies
-        SuggestionStrategy.ts
-        BookmarkStrategy.ts
-        RelatedArticleStrategy.ts
-        ShareableQuoteStrategy.ts
-      /factories
-        SuggestionFactory.ts
-  /shared
-    /components
-      ... (通用 UI 元件)
-    /hooks
-      ... (通用 hooks)
-    /utils
-      ... (工具類)
-  index.tsx
-  App.tsx
+src/
+├── pages/                    # 頁面目錄（類似 Next.js）
+│   ├── index.tsx            # / (首頁)
+│   ├── about.tsx            # /about (關於頁面)
+│   └── reader.tsx           # /reader (閱讀器頁面)
+├── router/
+│   └── routes.tsx           # 路由配置生成器
+├── components/
+│   ├── ui/                  # shadcn/ui 組件
+│   │   ├── button.tsx
+│   │   └── card.tsx
+│   └── Navigation.tsx       # 導航組件
+├── lib/
+│   └── utils.ts             # 工具函數
+├── App.tsx                  # 主應用組件
+└── main.tsx                 # 應用入口
 ```
 
 ---
 
-## router 引擎建議
+## 路由引擎實現
 
-| 技術選項                           | 建議                                    |
+| 技術選項                           | 實現                                    |
 | ------------------------------ | ------------------------------------- |
-| React Router v6                | 可直接配 folder as route (搭 Vite + React) |
-| Next.js app router             | 也可，page.tsx 就走 /app 樣式                |
-| Vite + React + TanStack Router | 輕量版 folder route                      |
+| React Router v6                | ✅ 已實現，配合文件系統路由架構 |
+| 文件系統路由                     | ✅ 基於 `/pages` 目錄自動生成 |
+| 懶加載 + Suspense              | ✅ 支援頁面按需加載 |
 
 ---
 
-## Summary
+## 運行方式
 
-* 主軸是 `/app/reader` → 很好擴充其他 AI driven page
-* strategy / controller / observer 各自分層，**低耦合**，方便重構
-* Sidebar layout 用 layout.tsx 包住，乾淨
-* 保留 shared 元件層，方便練 shadcn/ui
+```bash
+# 安裝依賴
+pnpm install
+
+# 啟動開發服務器
+pnpm dev
+```
+
+訪問 `http://localhost:5173` 查看應用
+
 
 ---
 
