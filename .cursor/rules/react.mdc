@@ -1,0 +1,18 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+
+# React Best Practices
+
+1. Always use function components and React Hooks, avoid class components.
+2. Avoid props drilling — use Context or state management (XState, Redux, etc.).
+3. Define props and state with `type` (or `interface` if needed).
+4. Break UI into small, reusable presentational components.
+5. Place side effects only inside `useEffect`, never in render.
+6. Consistently use ESLint + Prettier to enforce code style.
+7. Ensure strong typing, avoid using `any`.
+8. Prefer `const` declarations, use `let` only when necessary.
+9. Extract magic numbers or strings into constants.
+10. Provide unit tests or Storybook examples for components.
