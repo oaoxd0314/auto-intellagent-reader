@@ -1,12 +1,12 @@
 import { lazy } from 'react'
 import { RouteObject } from 'react-router-dom'
 
-// 页面组件懒加载
 const HomePage = lazy(() => import('@/pages/index'))
 const AboutPage = lazy(() => import('@/pages/about'))
 const ReaderPage = lazy(() => import('@/pages/reader'))
+const PostsIndex = lazy(() => import('@/pages/posts/index'))
+const PostDetail = lazy(() => import('@/pages/posts/[id]/index'))
 
-// 路由配置
 export const routes: RouteObject[] = [
   {
     path: '/',
@@ -17,14 +17,22 @@ export const routes: RouteObject[] = [
     element: <AboutPage />,
   },
   {
+    path: '/posts',
+    element: <PostsIndex />,
+  },
+  {
+    path: '/posts/:id',
+    element: <PostDetail />,
+  },
+  {
     path: '/reader',
     element: <ReaderPage />,
   },
 ]
 
-// 路由映射表（用于导航）
 export const routeMap = {
-  '/': '首页',
-  '/about': '关于',
-  '/reader': '阅读器',
+  '/': '首頁',
+  '/about': '關於',
+  '/posts': '文章',
+  '/reader': '閱讀器',
 } 

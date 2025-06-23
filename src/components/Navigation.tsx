@@ -28,11 +28,6 @@ export default function Navigation() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-muted-foreground">
-              基于文件系统路由
-            </span>
-          </div>
         </div>
       </div>
     </nav>
