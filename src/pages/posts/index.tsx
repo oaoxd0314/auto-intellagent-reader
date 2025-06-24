@@ -1,28 +1,10 @@
 import { Link } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { PostService } from '../../services/PostService'
-import type { Post } from '../../types/post'
+import { usePost } from '../../contexts/PostContext'
 
 export default function PostsIndex() {
-  const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(true)
+  const { posts, isLoading } = usePost()
 
-  useEffect(() => {
-    const loadPosts = async () => {
-      try {
-        const allPosts = await PostService.getAllPosts()
-        setPosts(allPosts)
-      } catch (error) {
-        console.error('Failed to load posts:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadPosts()
-  }, [])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">

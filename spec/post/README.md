@@ -40,10 +40,62 @@ interface Post {
 
 ## 🏗️ 完整技術架構
 
-### 1. MDX 文件存放區域 ✅
-**已實作：** 創建專門存放 `.mdx` 文件的目錄結構
+### 資料流架構
+```
+Pages → PostProvider (Context) → PostService → MarkdownFactory → MDX Files
+  ↓           ↓                      ↓             ↓               ↓
+UI組件    狀態管理+快取           業務服務層      核心邏輯        數據源
+```
 
-實際結構：
+### 1. 狀態管理層 ✅
+**已實作：** 使用 useReducer 的全域狀態管理
+
+```typescript
+// src/contexts/PostContext.tsx
+export function PostProvider({ children }: PostProviderProps)
+export function usePost(): PostContextType
+
+// 提供的功能：
+- posts: Post[]                    // 所有文章列表
+- currentPost: Post | null         // 當前查看的文章
+- isLoading: boolean              // 載入狀態
+- error: string | null            // 錯誤狀態
+- fetchAllPosts()                 // 載入所有文章
+- fetchPostById(id)               // 載入指定文章
+- getPostsByTag(tag)              // 按標籤篩選
+- getAllTags()                    // 獲取所有標籤
+```
+
+### 2. 業務服務層 ✅
+**已實作：** 純業務邏輯，可重用的服務接口
+
+```typescript
+// src/services/PostService.ts
+class PostService {
+  static async getAllPosts(): Promise<Post[]>
+  static async getPostById(id: string): Promise<Post | undefined>
+  static async getPostsByTag(tag: string): Promise<Post[]>
+  static async getAllTags(): Promise<string[]>
+  static getAvailablePostIds(): string[]
+}
+```
+
+### 3. 核心邏輯層 ✅
+**已實作：** MDX 文件處理和動態導入
+
+```typescript
+// src/lib/MarkdownFactory.ts
+class MarkdownFactory {
+  private static getMDXModules()                    // Vite import.meta.glob
+  static async loadPostById(id): Promise<Post>      // 載入單個文章
+  static async loadAllPosts(): Promise<Post[]>      // 載入所有文章
+  static getAvailablePostIds(): string[]            // 獲取文章 ID 列表
+}
+```
+
+### 4. 數據源層 ✅
+**已實作：** MDX 文件存放和 frontmatter 解析
+
 ```
 src/content/posts/
 ├── getting-started.mdx
@@ -51,10 +103,7 @@ src/content/posts/
 └── markdown-guide.mdx
 ```
 
-### 2. MDX Frontmatter 解析 ✅
-**已實作：** MDX 原生支援 frontmatter，無需額外套件
-
-標準格式：
+標準 frontmatter 格式：
 ```mdx
 ---
 title: "文章標題"
@@ -64,69 +113,17 @@ tags: ["tag1", "tag2"]
 ---
 
 # 文章內容
-
-這裡是 MDX 內容，支援 React 組件...
 ```
 
-### 3. MDX 文件讀取 Factory ✅
-**已實作：** 使用 Vite 的 import.meta.glob 動態導入
+### 5. UI 組件層 ✅
+**已實作：** 使用 PostProvider 的頁面組件
 
 ```typescript
-// src/services/MarkdownFactory.ts
-class MarkdownFactory {
-  // 使用 import.meta.glob 動態導入所有 MDX 文件
-  static getMDXModules()
-  
-  // 載入單個文章
-  static async loadPostById(id: string): Promise<Post | undefined>
-  
-  // 載入所有文章
-  static async loadAllPosts(): Promise<Post[]>
-  
-  // 獲取所有可用的文章 ID
-  static getAvailablePostIds(): string[]
-}
-```
+// 文章列表頁面
+const { posts, isLoading } = usePost()
 
-### 4. 真正的 Data Source ✅
-**已實作：** 分層架構的數據源服務
-
-```typescript
-// src/services/PostService.ts (業務服務層)
-class PostService {
-  // 從 MDX 文件獲取所有文章
-  static async getAllPosts(): Promise<Post[]>
-  
-  // 從 MDX 文件獲取指定文章
-  static async getPostById(id: string): Promise<Post | undefined>
-  
-  // 根據標籤篩選文章
-  static async getPostsByTag(tag: string): Promise<Post[]>
-  
-  // 獲取所有標籤
-  static async getAllTags(): Promise<string[]>
-  
-  // 獲取所有可用的文章 ID
-  static getAvailablePostIds(): string[]
-}
-
-// src/lib/MarkdownFactory.ts (核心業務邏輯)
-class MarkdownFactory {
-  // MDX 文件動態導入和解析
-  static async loadAllPosts(): Promise<Post[]>
-  static async loadPostById(id: string): Promise<Post | undefined>
-}
-```
-
-### 5. 統一數據接口 ✅
-**已實作：** 分層架構的服務調用
-
-```typescript
-// 頁面直接調用 PostService
-import { PostService } from '../services/PostService'
-
-const posts = await PostService.getAllPosts()
-const post = await PostService.getPostById(id)
+// 文章詳情頁面
+const { currentPost, fetchPostById } = usePost()
 ```
 
 ### 6. MDX 樣式系統 ✅

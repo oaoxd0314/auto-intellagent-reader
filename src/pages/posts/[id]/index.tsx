@@ -1,45 +1,22 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
-import { PostService } from '../../../services/PostService'
-import type { Post } from '../../../types/post'
+import { useEffect } from 'react'
+import { usePost } from '../../../contexts/PostContext'
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>()
-  const [post, setPost] = useState<Post | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  const { currentPost, isLoading, error, fetchPostById } = usePost()
   
   useEffect(() => {
-    const loadPost = async () => {
-      if (!id) {
-        setNotFound(true)
-        setLoading(false)
-        return
-      }
-
-      try {
-        const postData = await PostService.getPostById(id)
-        if (postData) {
-          setPost(postData)
-        } else {
-          setNotFound(true)
-        }
-      } catch (error) {
-        console.error('Failed to load post:', error)
-        setNotFound(true)
-      } finally {
-        setLoading(false)
-      }
+    if (id) {
+      fetchPostById(id)
     }
-
-    loadPost()
-  }, [id])
+  }, [id, fetchPostById])
   
   if (!id) {
     return <Navigate to="/posts" replace />
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -49,7 +26,7 @@ export default function PostDetail() {
     )
   }
   
-  if (notFound || !post) {
+  if (error || !currentPost) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -83,16 +60,16 @@ export default function PostDetail() {
 
       {/* 文章標題和元數據 */}
       <header className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{currentPost.title}</h1>
         
         <div className="flex items-center gap-4 text-gray-600 text-sm mb-4">
-          <span>發布日期: {post.date}</span>
-          {post.author && <span>作者: {post.author}</span>}
+          <span>發布日期: {currentPost.date}</span>
+          {currentPost.author && <span>作者: {currentPost.author}</span>}
         </div>
         
-        {post.tags && post.tags.length > 0 && (
+        {currentPost.tags && currentPost.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {post.tags.map(tag => (
+            {currentPost.tags.map((tag: string) => (
               <span 
                 key={tag}
                 className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
@@ -106,8 +83,8 @@ export default function PostDetail() {
 
       {/* 文章內容 */}
       <article className="prose prose-lg max-w-none">
-        {post.component ? (
-          <post.component />
+        {currentPost.component ? (
+          <currentPost.component />
         ) : (
           <div className="text-gray-500">
             <p>文章內容載入失敗</p>
