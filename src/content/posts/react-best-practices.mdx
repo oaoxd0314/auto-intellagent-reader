@@ -1,0 +1,74 @@
+---
+title: "React 開發最佳實踐"
+date: "2024-01-20"
+author: "System"
+tags: ["react", "javascript", "best-practices"]
+---
+
+# React 開發最佳實踐
+
+在 React 開發中，遵循最佳實踐可以讓你的代碼更加清晰和可維護。
+
+## 1. 組件設計
+
+### 保持組件簡單
+每個組件應該只做一件事情：
+
+```jsx
+// ✅ 好的做法
+function UserProfile({ user }) {
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  )
+}
+```
+
+### 使用 TypeScript
+TypeScript 可以幫助你避免很多運行時錯誤：
+
+```tsx
+interface User {
+  name: string
+  email: string
+}
+
+function UserProfile({ user }: { user: User }) {
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  )
+}
+```
+
+## 2. State 管理
+
+使用 `useState` 進行簡單的狀態管理：
+
+```jsx
+function Counter() {
+  const [count, setCount] = useState(0)
+  
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => setCount(count + 1)}>
+        增加
+      </button>
+    </div>
+  )
+}
+```
+
+## 總結
+
+- 保持組件簡單
+- 使用 TypeScript
+- 合理管理狀態
+- 遵循命名規範
+
+這些簡單的原則就能讓你的 React 代碼更加優秀！ 

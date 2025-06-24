@@ -1,8 +1,18 @@
 import { Link } from 'react-router-dom'
-import { getAllPosts } from '../../data/posts'
+import { usePost } from '../../contexts/PostContext'
 
 export default function PostsIndex() {
-  const posts = getAllPosts()
+  const { posts, isLoading } = usePost()
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <p>載入中...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -21,7 +31,8 @@ export default function PostsIndex() {
             </h2>
             
             <div className="text-gray-600 text-sm mb-3">
-              發布日期: {post.date}
+              <div>發布日期: {post.date}</div>
+              {post.author && <div>作者: {post.author}</div>}
             </div>
             
             {post.tags && post.tags.length > 0 && (

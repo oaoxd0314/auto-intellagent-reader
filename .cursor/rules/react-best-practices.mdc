@@ -1,0 +1,33 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# React Best Practices
+
+1. Always use function components and React Hooks, avoid class components.
+2. Avoid props drilling — use Context or state management (XState, Redux, etc.).
+3. Define props and state with `type` (or `interface` if needed).
+4. Break UI into small, reusable presentational components.
+5. Place side effects only inside `useEffect`, never in render.
+6. Consistently use ESLint + Prettier to enforce code style.
+7. Ensure strong typing, avoid using `any`.
+8. Prefer `const` declarations, use `let` only when necessary.
+9. Extract magic numbers or strings into constants.
+10. Provide unit tests or Storybook examples for components.
+
+## Component Patterns
+
+11. **Custom Hooks for Logic Reuse** — Extract complex logic into custom hooks for better reusability.
+12. **Compound Components** — Use compound component pattern for flexible, composable UI components.
+13. **Render Props Pattern** — Use render props for sharing code between components when hooks aren't sufficient.
+14. **Higher-Order Components (HOCs)** — Use HOCs sparingly, prefer hooks and composition.
+15. **Conditional Rendering** — Use short-circuit evaluation (`&&`) and ternary operators appropriately.
+
+## Performance Optimization
+
+16. **React.memo for Pure Components** — Wrap components with React.memo to prevent unnecessary re-renders.
+17. **useMemo and useCallback** — Use for expensive calculations and stable function references.
+18. **Lazy Loading** — Use React.lazy() and Suspense for code splitting and lazy loading.
+19. **Key Props** — Always provide stable, unique keys for list items.
+20. **Avoid Inline Objects** — Don't create objects inline in JSX to prevent unnecessary re-renders.

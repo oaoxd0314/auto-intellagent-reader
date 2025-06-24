@@ -1,0 +1,161 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Architecture Patterns & Best Practices
+
+## 🏗️ Core Architecture Principles
+
+### 1. **Layered Architecture Pattern**
+```
+Pages → Providers (Context) → Services → Factories → Data Sources
+```
+- Each layer has a single, well-defined responsibility
+- Dependencies flow in one direction only
+- Higher layers depend on lower layers, never the reverse
+
+### 2. **Provider Pattern for State Management**
+```typescript
+// ✅ Good: Centralized state with useReducer
+const [state, dispatch] = useReducer(reducer, initialState)
+
+// ❌ Bad: Scattered useState across components
+const [posts, setPosts] = useState([])
+const [loading, setLoading] = useState(false)
+```
+**Rule:** Use Context + useReducer for complex state that needs to be shared across multiple components.
+
+### 3. **Factory Pattern for Data Processing**
+```typescript
+// ✅ Good: Dedicated factory for object creation
+class PostFactory {
+  static async createFromMDX(mdxModule): Promise<Post> { ... }
+}
+
+// ❌ Bad: Data processing scattered in components
+const post = { id: mdx.id, title: mdx.frontmatter.title, ... }
+```
+**Rule:** Create Factory classes to handle complex object creation and data transformation logic.
+
+### 4. **Service Layer for Business Logic**
+```typescript
+// ✅ Good: Pure business logic in services
+class PostService {
+  static async getPostsByTag(tag: string): Promise<Post[]> { ... }
+}
+
+// ❌ Bad: Business logic mixed with UI logic
+const filteredPosts = posts.filter(post => post.tags?.includes(selectedTag))
+```
+**Rule:** Keep business logic separate from UI logic in dedicated Service classes.
+
+### 5. **Single Responsibility Principle**
+- **Providers:** State management, caching, UI-related side effects
+- **Services:** Business logic, data validation, business rules
+- **Factories:** Data transformation, object creation, parsing
+- **Components:** UI rendering, user interactions, presentation logic
+
+### 6. **Smart Caching Strategy**
+```typescript
+// ✅ Good: Intelligent caching in Context
+const cachedPost = state.posts.find(post => post.id === id)
+if (cachedPost) return cachedPost
+
+// ❌ Bad: Always fetching from source
+const post = await PostService.getPostById(id)
+```
+**Rule:** Implement caching at the Provider level to minimize redundant data fetching.
+
+## 🔄 Data Flow Patterns
+
+### 1. **Unidirectional Data Flow**
+```
+User Action → Dispatch → Reducer → State Update → UI Re-render
+```
+
+### 2. **Async Action Pattern**
+```typescript
+// ✅ Good: Async actions with proper error handling
+const fetchPosts = async () => {
+  dispatch({ type: 'FETCH_START' })
+  try {
+    const posts = await PostService.getAllPosts()
+    dispatch({ type: 'FETCH_SUCCESS', payload: posts })
+  } catch (error) {
+    dispatch({ type: 'FETCH_ERROR', payload: error.message })
+  }
+}
+```
+
+### 3. **Error Handling by Layer**
+- **UI Layer:** User-friendly error messages, fallback UI
+- **Provider Layer:** Global error state, error recovery
+- **Service Layer:** Business error validation, error transformation
+- **Factory Layer:** Data parsing errors, format validation
+
+## 🎯 Implementation Guidelines
+
+### 1. **Context Provider Setup**
+```typescript
+// Always provide these in your Context:
+interface ContextType {
+  // State
+  data: T[]
+  currentItem: T | null
+  isLoading: boolean
+  error: string | null
+  
+  // Actions
+  fetchAll: () => Promise<void>
+  fetchById: (id: string) => Promise<void>
+  
+  // Utilities
+  getById: (id: string) => T | undefined
+  clearError: () => void
+}
+```
+
+### 2. **Service Class Structure**
+```typescript
+class EntityService {
+  // Basic CRUD
+  static async getAll(): Promise<T[]>
+  static async getById(id: string): Promise<T | undefined>
+  
+  // Business logic
+  static async getByCategory(category: string): Promise<T[]>
+  static async getAllCategories(): Promise<string[]>
+}
+```
+
+### 3. **Factory Class Structure**
+```typescript
+class EntityFactory {
+  // Data transformation
+  static async createFromSource(source: any): Promise<T>
+  static async createMany(sources: any[]): Promise<T[]>
+  
+  // Validation
+  private static validate(data: any): boolean
+}
+```
+
+## 🚀 Benefits of This Architecture
+
+1. **Testability:** Each layer can be tested independently
+2. **Maintainability:** Clear separation of concerns
+3. **Scalability:** Easy to add new features without affecting existing code
+4. **Reusability:** Services and Factories can be used across different contexts
+5. **Performance:** Smart caching reduces unnecessary operations
+6. **Developer Experience:** Predictable patterns and clear responsibilities
+
+## 📋 Checklist for New Features
+
+- [ ] Does this belong in a Provider, Service, or Factory?
+- [ ] Is the data flow unidirectional?
+- [ ] Are errors handled at the appropriate layer?
+- [ ] Is caching implemented where beneficial?
+- [ ] Are side effects properly contained?
+- [ ] Is the business logic separate from UI logic?
+- [ ] Can this be tested independently?
