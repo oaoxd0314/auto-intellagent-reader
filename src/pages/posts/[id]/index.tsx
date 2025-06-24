@@ -1,7 +1,6 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { PostService } from '../../../services/PostService'
-import { CustomMDXProvider } from '../../../components/MDXProvider'
 import type { Post } from '../../../types/post'
 
 export default function PostDetail() {
@@ -107,15 +106,13 @@ export default function PostDetail() {
 
       {/* 文章內容 */}
       <article className="prose prose-lg max-w-none">
-        <CustomMDXProvider>
-          {post.component ? (
-            <post.component />
-          ) : (
-            <div className="text-gray-500">
-              <p>文章內容載入失敗</p>
-            </div>
-          )}
-        </CustomMDXProvider>
+        {post.component ? (
+          <post.component />
+        ) : (
+          <div className="text-gray-500">
+            <p>文章內容載入失敗</p>
+          </div>
+        )}
       </article>
 
       {/* 返回按鈕 */}

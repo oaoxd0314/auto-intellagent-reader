@@ -1,4 +1,4 @@
-import { MarkdownFactory } from './MarkdownFactory'
+import { MarkdownFactory } from '../lib/MarkdownFactory'
 import type { Post } from '../types/post'
 
 export class PostDataSource {

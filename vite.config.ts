@@ -15,6 +15,7 @@ export default defineConfig({
         [remarkMdxFrontmatter, { name: 'frontmatter' }]
       ],
       rehypePlugins: [],
+      providerImportSource: '@mdx-js/react'
     })
   ],
   resolve: {
