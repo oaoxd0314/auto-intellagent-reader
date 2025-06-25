@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
-import { PostService } from '../services/PostService'
+import { PostController } from '../controllers/PostController'
 import type { Post } from '../types/post'
 
 // 狀態類型
@@ -113,6 +113,7 @@ interface PostProviderProps {
 // Provider Component
 export function PostProvider({ children }: PostProviderProps) {
   const [state, dispatch] = useReducer(postReducer, initialState)
+  const postController = PostController.getInstance()
 
   // 載入所有文章
   const fetchAllPosts = async (): Promise<void> => {
@@ -122,7 +123,7 @@ export function PostProvider({ children }: PostProviderProps) {
 
     dispatch({ type: 'FETCH_POSTS_START' })
     try {
-      const posts = await PostService.getAllPosts()
+      const posts = await postController.getAllPosts()
       dispatch({ type: 'FETCH_POSTS_SUCCESS', payload: posts })
     } catch (error) {
       dispatch({ 
@@ -135,7 +136,7 @@ export function PostProvider({ children }: PostProviderProps) {
   // 載入單個文章
   const fetchPostById = async (id: string): Promise<void> => {
     // 先檢查快取
-    const cachedPost = state.posts.find(post => post.id === id)
+    const cachedPost = getPostById(id)
     if (cachedPost) {
       dispatch({ type: 'SET_CURRENT_POST', payload: cachedPost })
       return
@@ -143,7 +144,7 @@ export function PostProvider({ children }: PostProviderProps) {
 
     dispatch({ type: 'FETCH_POST_START' })
     try {
-      const post = await PostService.getPostById(id)
+      const post = await postController.getPostById(id)
       if (post) {
         dispatch({ type: 'FETCH_POST_SUCCESS', payload: post })
       } else {
@@ -174,20 +175,12 @@ export function PostProvider({ children }: PostProviderProps) {
 
   // 根據標籤篩選文章
   const getPostsByTag = (tag: string): Post[] => {
-    return state.posts.filter(post => 
-      post.tags && post.tags.includes(tag)
-    )
+    return postController.filterPostsByTag(state.posts, tag)
   }
 
   // 獲取所有標籤
   const getAllTags = (): string[] => {
-    const tagSet = new Set<string>()
-    state.posts.forEach(post => {
-      if (post.tags) {
-        post.tags.forEach(tag => tagSet.add(tag))
-      }
-    })
-    return Array.from(tagSet).sort()
+    return postController.extractAllTags(state.posts)
   }
 
   // 初始化時載入所有文章

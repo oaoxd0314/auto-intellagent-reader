@@ -2,6 +2,51 @@
 
 ## 🏗️ 系統架構
 
+### 分層架構原則
+
+本系統採用清晰的三層架構設計，確保責任分離和代碼可維護性：
+
+```
+UI Components → Context → Controller → Service
+```
+
+#### **分層責任定義**
+
+**🎯 Context 層**
+- **職責**: React 狀態管理和 UI 邏輯
+- **負責**: 
+  - 管理組件狀態（useState、useReducer）
+  - 處理 UI 相關的快取邏輯
+  - 提供 React Hooks 接口
+  - 事件分發給 Controller 層
+- **不負責**: 業務邏輯計算、數據持久化
+
+**🎮 Controller 層**
+- **職責**: 協調業務邏輯和流程控制
+- **負責**:
+  - 業務邏輯協調（如數據篩選、計算）
+  - 流程控制（如追蹤開始/停止）
+  - 策略模式管理
+  - 事件系統和狀態管理
+  - 錯誤處理和日誌記錄
+- **不負責**: UI 狀態管理、直接數據 CRUD
+
+**🔧 Service 層**
+- **職責**: 專注數據操作和持久化
+- **負責**:
+  - 數據 CRUD 操作
+  - 外部 API 調用
+  - 數據持久化（localStorage、IndexedDB）
+  - 數據格式轉換
+  - 基礎工具函數
+- **不負責**: 業務邏輯、UI 狀態管理
+
+#### **層級依賴規則**
+- ✅ Context → Controller → Service
+- ❌ Service 不能直接調用 Context
+- ❌ Controller 不能直接操作 React 狀態
+- ❌ Service 不能包含業務邏輯計算
+
 ### 整體架構圖
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -81,64 +126,89 @@ src/
 ├── pages/                    # 頁面目錄（文件系統路由）
 │   ├── index.tsx            # 首頁 (/)
 │   ├── about.tsx            # 關於頁面 (/about)
-│   └── reader.tsx           # 閱讀器頁面 (/reader)
-├── components/              # 組件目錄
+│   ├── reader.tsx           # 閱讀器頁面 (/reader)
+│   └── posts/               # 文章相關頁面
+│       ├── index.tsx        # 文章列表頁
+│       └── [id]/            # 動態路由
+│           └── index.tsx    # 文章詳情頁
+├── components/              # UI 組件目錄
 │   ├── ui/                  # shadcn/ui 基礎組件
 │   │   ├── button.tsx
 │   │   ├── card.tsx
 │   │   └── ...
-│   ├── reader/              # 閱讀器相關組件
-│   │   ├── ReaderPage.tsx
-│   │   ├── AISidebar.tsx
-│   │   └── SuggestionCard.tsx
 │   └── Navigation.tsx       # 導航組件
-├── lib/                     # 工具庫
-│   ├── utils.ts             # 通用工具函數
-│   ├── types.ts             # TypeScript 類型定義
-│   └── constants.ts         # 常量定義
-├── hooks/                   # 自定義 Hooks
-│   ├── useReaderContext.ts
-│   ├── useUserEvents.ts
-│   └── useSuggestions.ts
-├── strategies/              # AI 策略實現
-│   ├── base/
-│   │   └── SuggestionStrategy.ts
-│   ├── BookmarkStrategy.ts
-│   ├── RelatedArticleStrategy.ts
-│   └── ShareableQuoteStrategy.ts
-├── controllers/             # 控制器
-│   ├── AbstractController.ts
-│   ├── ReaderController.ts
-│   └── AIController.ts
-├── observers/               # 觀察者模式
-│   ├── UserEventObserver.ts
-│   ├── ScrollObserver.ts
-│   └── IdleObserver.ts
-├── factories/               # 工廠模式
-│   └── SuggestionFactory.ts
-├── router/
-│   └── routes.tsx           # 路由配置生成器
+├── contexts/                # Context 層 - React 狀態管理
+│   └── PostContext.tsx      # 文章相關狀態管理
+├── controllers/             # Controller 層 - 業務邏輯協調
+│   ├── AbstractController.ts # 控制器基類
+│   ├── PostController.ts    # 文章業務邏輯控制器
+│   ├── BehaviorController.ts # 行為追蹤控制器
+│   └── index.ts             # 控制器導出
+├── services/                # Service 層 - 數據操作
+│   ├── PostService.ts       # 文章數據服務
+│   ├── BehaviorService.ts   # 行為數據服務
+│   └── PostDataSource.ts   # 數據源服務
+├── lib/                     # 工具庫和核心邏輯
+│   ├── MarkdownFactory.ts   # MDX 文件處理器
+│   └── utils.ts             # 通用工具函數
+├── types/                   # TypeScript 類型定義
+│   ├── post.ts              # 文章相關類型
+│   ├── behavior.ts          # 行為追蹤類型
+│   ├── controller.ts        # 控制器類型
+│   └── suggestion.ts        # 建議系統類型
+├── content/                 # 靜態內容文件
+│   └── posts/               # MDX 文章文件
+│       ├── getting-started.mdx
+│       ├── react-best-practices.mdx
+│       └── markdown-guide.mdx
+├── router/                  # 路由配置
+│   └── routes.tsx           # 路由定義
 ├── App.tsx                  # 主應用組件
-└── main.tsx                 # 應用入口
+├── main.tsx                 # 應用入口
+└── index.css                # 全局樣式
 ```
 
 ## 🔄 數據流設計
+
+### 分層數據流
+```
+UI Components → Context → Controller → Service
+     ↑            ↓         ↓           ↓
+   Render    State Mgmt  Business   Data Layer
+   Update    & Events    Logic      Operations
+```
+
+### 實際調用流程
+```typescript
+// 1. UI 組件調用 Context
+const { posts, fetchAllPosts } = usePost()
+
+// 2. Context 委託給 Controller
+const postController = PostController.getInstance()
+const posts = await postController.getAllPosts()
+
+// 3. Controller 調用 Service
+const posts = await PostService.getAllPosts()
+
+// 4. Service 處理數據操作
+return await MarkdownFactory.loadAllPosts()
+```
 
 ### 事件驅動流程
 ```
 1. User Action (滾動/懸停/選擇)
    ↓
-2. Event Observer (捕獲用戶行為)
+2. Context (捕獲 React 事件)
    ↓
-3. Controller (處理事件邏輯)
+3. Controller (處理業務邏輯)
    ↓
-4. Context Update (更新閱讀上下文)
+4. Service (數據持久化)
    ↓
-5. Strategy Selection (選擇合適策略)
+5. Controller (策略分析)
    ↓
-6. Suggestion Generation (生成建議)
+6. Context (狀態更新)
    ↓
-7. UI Render (渲染建議組件)
+7. UI Render (組件重新渲染)
 ```
 
 ### 上下文數據結構

@@ -32,35 +32,5 @@ export class PostService {
         }
     }
 
-    // 根據標籤篩選文章
-    static async getPostsByTag(tag: string): Promise<Post[]> {
-        try {
-            const allPosts = await this.getAllPosts()
-            return allPosts.filter(post =>
-                post.tags && post.tags.includes(tag)
-            )
-        } catch (error) {
-            console.error(`Failed to get posts by tag ${tag}:`, error)
-            return []
-        }
-    }
 
-    // 獲取所有標籤
-    static async getAllTags(): Promise<string[]> {
-        try {
-            const allPosts = await this.getAllPosts()
-            const tagSet = new Set<string>()
-
-            allPosts.forEach(post => {
-                if (post.tags) {
-                    post.tags.forEach(tag => tagSet.add(tag))
-                }
-            })
-
-            return Array.from(tagSet).sort()
-        } catch (error) {
-            console.error('Failed to get all tags:', error)
-            return []
-        }
-    }
 } 
