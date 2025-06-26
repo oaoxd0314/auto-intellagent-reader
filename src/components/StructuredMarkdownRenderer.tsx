@@ -91,6 +91,8 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
     }
   }, [selectedText, currentSectionId])
 
+
+
   /**
    * 生成段落 ID - 為每個段落生成穩定的 ID
    */
@@ -272,6 +274,7 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
           >
             <span className="w-3 h-3 bg-yellow-300 rounded border border-yellow-400"></span>
             <span>標記</span>
+            <kbd className="ml-1 text-xs opacity-60 bg-gray-100 px-1 rounded">⌘⇧H</kbd>
           </button>
           <button
             onClick={handleAddComment}
@@ -282,6 +285,7 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
           >
             <span className="text-sm">💬</span>
             <span>評論</span>
+            <kbd className="ml-1 text-xs opacity-60 bg-gray-100 px-1 rounded">⌘⇧C</kbd>
           </button>
         </div>
       </div>
@@ -458,6 +462,45 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
     return () => document.removeEventListener('click', handleClickOutside)
   }, [showInteractionMenu])
 
+  // 鍵盤快捷鍵支援
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // 只在有選擇文字時處理快捷鍵
+      if (!selectedText || !showInteractionMenu) return
+      
+      // Cmd+Shift+H: 標記
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'H') {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        handleAddMark()
+      }
+      
+      // Cmd+Shift+C: 評論
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'C') {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+        handleAddComment()
+      }
+      
+      // Escape: 清除選擇
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        setShowInteractionMenu(false)
+        setSelectedText('')
+        setSelectionPosition(null)
+        setSelectionRange(null)
+        setCurrentSectionId('')
+        clearSelection()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true })
+  }, [selectedText, showInteractionMenu, handleAddMark, handleAddComment])
+
   // 載入互動記錄
   useEffect(() => {
     postController.loadInteractions()
@@ -495,6 +538,7 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
         {getMarkStyles() && (
           <style dangerouslySetInnerHTML={{ __html: getMarkStyles() }} />
         )}
+        
         
         {/* 文章內容 */}
         {post.component ? (
