@@ -5,8 +5,9 @@
 1. **MDX render** - 真正的 MDX 文件渲染 ✅ 
 2. **/posts** - 列出所有文章 ✅
 3. **/posts/:id** - 顯示指定文章 ✅
+4. **結構化互動** - 文字選擇、標記、評論功能 ✅
 
-**🎉 所有核心功能已完成！**
+**🎉 所有核心功能已完成！新增互動功能完成！**
 
 ## ✅ 已完成功能
 
@@ -20,6 +21,8 @@
   
 - **文章詳情頁面** (`src/pages/posts/[id]/index.tsx`)
   - 完整文章內容顯示
+  - **新增：結構化 Markdown 渲染器** ✅
+  - **新增：文字選擇和互動功能** ✅
   - MDX 組件渲染（比 ReactMarkdown 更強）
   - 返回列表導航
   - CustomMDXProvider 統一樣式
@@ -36,7 +39,99 @@ interface Post {
   tags?: string[]         // 標籤陣列（可選）
   component?: React.ComponentType // MDX 組件
 }
+
+// 新增：互動相關類型 ✅
+interface PostInteraction {
+  id: string
+  postId: string
+  type: 'reply' | 'mark' | 'comment'
+  content: string
+  selectedText?: string
+  position?: TextPosition
+  timestamp: string
+  author?: string
+}
+
+interface TextPosition {
+  start: number
+  end: number
+  sectionId?: string
+}
 ```
+
+### 3. 新增：結構化互動系統 ✅
+
+#### 3.1 StructuredMarkdownRenderer 組件
+**位置：** `src/components/StructuredMarkdownRenderer.tsx`
+
+**功能：**
+- 文字選擇檢測
+- 互動選單顯示（標記、評論）
+- 標記文字高亮顯示
+- 評論對話框
+- 回覆文章對話框
+- 互動記錄顯示
+
+**使用方式：**
+```typescript
+<StructuredMarkdownRenderer
+  post={post}
+  interactions={interactions}
+  onTextSelect={handleTextSelect}
+  onAddMark={handleAddMark}
+  onAddComment={handleAddComment}
+  onAddReply={handleAddReply}
+/>
+```
+
+#### 3.2 PostController 互動功能擴展
+**新增方法：**
+```typescript
+// 添加互動
+addReply(postId: string, content: string): void
+addMark(postId: string, selectedText: string, position: TextPosition): void
+addComment(postId: string, selectedText: string, comment: string, position: TextPosition): void
+
+// 查詢互動
+getInteractions(postId: string): PostInteraction[]
+getAllInteractions(): PostInteraction[]
+getInteractionStats(postId?: string): InteractionStats
+
+// 管理互動
+removeInteraction(interactionId: string): void
+clearInteractions(postId: string): void
+loadInteractions(): void // 從 localStorage 載入
+```
+
+**數據持久化：**
+- 使用 localStorage 存儲互動記錄
+- 自動載入和保存
+- 錯誤處理和日誌記錄
+
+#### 3.3 互動功能詳細說明
+
+**1. Reply Post（回覆文章）**
+- 點擊「回覆文章」按鈕
+- 彈出回覆對話框
+- 提交後顯示在互動記錄區域
+
+**2. Select section & add mark（選擇段落並標記）**
+- 選中文字後自動顯示互動選單
+- 點擊「標記」按鈕
+- 文字以黃色背景高亮顯示
+- 滑鼠懸停顯示標記時間
+
+**3. Select section & comment（選擇段落並評論）**
+- 選中文字後點擊「評論」按鈕
+- 彈出評論對話框，顯示選中文字
+- 輸入評論內容並提交
+- 評論顯示在互動記錄區域
+
+**UI 特性：**
+- 非侵入式設計，不影響正常閱讀
+- 響應式互動選單
+- 優雅的對話框設計
+- 清晰的互動記錄展示
 
 ## 🏗️ 完整技術架構
 

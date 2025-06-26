@@ -1,6 +1,7 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { usePost } from '../../../contexts/PostContext'
+import { StructuredMarkdownRenderer } from '../../../components/StructuredMarkdownRenderer'
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>()
@@ -94,15 +95,11 @@ export default function PostDetail() {
         )}
       </header>
 
-      {/* 文章內容 */}
-      <article className="prose prose-lg max-w-none">
-        {post.component ? (
-          <post.component />
-        ) : (
-          <div className="text-gray-500">
-            <p>文章內容載入失敗</p>
-          </div>
-        )}
+      {/* 文章內容 - 使用結構化渲染器 */}
+      <article>
+                <StructuredMarkdownRenderer 
+          post={post}
+        />
       </article>
 
       {/* 推薦文章 */}
