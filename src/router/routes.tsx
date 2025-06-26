@@ -3,9 +3,9 @@ import { RouteObject } from 'react-router-dom'
 
 const HomePage = lazy(() => import('@/pages/index'))
 const AboutPage = lazy(() => import('@/pages/about'))
-const ReaderPage = lazy(() => import('@/pages/reader'))
 const PostsIndex = lazy(() => import('@/pages/posts/index'))
 const PostDetail = lazy(() => import('@/pages/posts/[id]/index'))
+const NotFoundPage = lazy(() => import('@/pages/404'))
 
 export const routes: RouteObject[] = [
   {
@@ -25,8 +25,8 @@ export const routes: RouteObject[] = [
     element: <PostDetail />,
   },
   {
-    path: '/reader',
-    element: <ReaderPage />,
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]
 
@@ -35,4 +35,5 @@ export const routeMap = {
   '/about': '關於',
   '/posts': '文章',
   '/reader': '閱讀器',
+  '/test-controller': '控制器測試',
 } 
