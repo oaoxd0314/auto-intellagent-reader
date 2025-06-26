@@ -43,6 +43,57 @@ export function useTextSelection(): UseTextSelectionReturn {
     }, [])
 
     /**
+     * 穩定化選擇範圍 - 修正邊界跳動問題
+     */
+    const stabilizeSelection = useCallback((range: Range): Range | null => {
+        try {
+            const clonedRange = range.cloneRange()
+
+            // 如果選擇範圍很小且在文字節點邊界，嘗試調整
+            if (clonedRange.collapsed || clonedRange.toString().trim().length === 0) {
+                return null
+            }
+
+            // 處理開始位置 - 確保不在空白字元上
+            let startContainer = clonedRange.startContainer
+            let startOffset = clonedRange.startOffset
+
+            if (startContainer.nodeType === Node.TEXT_NODE) {
+                const text = startContainer.textContent || ''
+                // 跳過開頭的空白字元
+                while (startOffset < text.length && /\s/.test(text[startOffset])) {
+                    startOffset++
+                }
+                clonedRange.setStart(startContainer, Math.min(startOffset, text.length))
+            }
+
+            // 處理結束位置 - 確保不在空白字元上
+            let endContainer = clonedRange.endContainer
+            let endOffset = clonedRange.endOffset
+
+            if (endContainer.nodeType === Node.TEXT_NODE) {
+                const text = endContainer.textContent || ''
+                // 跳過結尾的空白字元
+                while (endOffset > 0 && /\s/.test(text[endOffset - 1])) {
+                    endOffset--
+                }
+                clonedRange.setEnd(endContainer, Math.max(endOffset, 0))
+            }
+
+            // 檢查調整後的範圍是否有效
+            const finalText = clonedRange.toString().trim()
+            if (finalText.length === 0) {
+                return null
+            }
+
+            return clonedRange
+        } catch (error) {
+            console.warn('Selection stabilization failed:', error)
+            return range
+        }
+    }, [])
+
+    /**
      * 計算選單位置
      */
     const calculateMenuPosition = useCallback((range: Range) => {
@@ -72,7 +123,7 @@ export function useTextSelection(): UseTextSelectionReturn {
     }, [])
 
     /**
-     * 處理文字選擇 - 簡化邏輯，減少跳躍
+     * 處理文字選擇 - 加入穩定化邏輯，減少跳躍
      */
     const handleTextSelection = useCallback(() => {
         const selection = window.getSelection()
@@ -83,7 +134,7 @@ export function useTextSelection(): UseTextSelectionReturn {
         }
 
         const range = selection.getRangeAt(0)
-        const text = selection.toString().trim()
+        let text = selection.toString().trim()
 
         if (text.length === 0) {
             setShowInteractionMenu(false)
@@ -96,22 +147,36 @@ export function useTextSelection(): UseTextSelectionReturn {
             return
         }
 
-        // 計算位置
-        const position: TextPosition = {
-            start: range.startOffset,
-            end: range.endOffset,
-            sectionId: generateSectionId(range.startContainer)
+        // 穩定化選擇範圍
+        const stabilizedRange = stabilizeSelection(range)
+        if (!stabilizedRange) {
+            setShowInteractionMenu(false)
+            return
         }
 
-        const menuPos = calculateMenuPosition(range)
+        // 使用穩定化後的文字和範圍
+        text = stabilizedRange.toString().trim()
+        if (text.length === 0) {
+            setShowInteractionMenu(false)
+            return
+        }
 
-        // 直接更新，不使用複雜的清除邏輯
+        // 計算位置
+        const position: TextPosition = {
+            start: stabilizedRange.startOffset,
+            end: stabilizedRange.endOffset,
+            sectionId: generateSectionId(stabilizedRange.startContainer)
+        }
+
+        const menuPos = calculateMenuPosition(stabilizedRange)
+
+        // 更新選擇狀態
         setSelectedText(text)
         setSelectionPosition(position)
-        setSelectionRange(range.cloneRange())
+        setSelectionRange(stabilizedRange.cloneRange())
         setMenuPosition(menuPos)
         setShowInteractionMenu(true)
-    }, [generateSectionId, calculateMenuPosition])
+    }, [generateSectionId, calculateMenuPosition, stabilizeSelection])
 
     /**
      * 清除選擇
@@ -131,7 +196,15 @@ export function useTextSelection(): UseTextSelectionReturn {
 
         const handleSelectionChange = () => {
             clearTimeout(timeoutId)
-            timeoutId = setTimeout(handleTextSelection, 50) // 50ms debounce
+            timeoutId = setTimeout(() => {
+                // 額外檢查：確保選擇長度足夠
+                const selection = window.getSelection()
+                if (selection && selection.toString().trim().length >= 1) {
+                    handleTextSelection()
+                } else {
+                    setShowInteractionMenu(false)
+                }
+            }, 100) // 增加 debounce 時間到 100ms
         }
 
         const handleMouseDown = (event: MouseEvent) => {
