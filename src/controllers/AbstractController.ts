@@ -20,6 +20,9 @@ export abstract class AbstractController<T = any> implements IController<T> {
         debugMode: false
     }
 
+    // 銷毀標記，用於控制 setState 行為
+    private _isDestroying = false
+
     constructor(
         protected readonly name: string,
         initialState: T,
@@ -47,7 +50,8 @@ export abstract class AbstractController<T = any> implements IController<T> {
     }
 
     setState(newState: Partial<T>): void {
-        if (this.state.isDestroyed) {
+        // 檢查是否正在銷毀或已銷毀
+        if (this._isDestroying || this.state.isDestroyed) {
             throw new ControllerError(
                 'Cannot set state on destroyed controller',
                 this.name,
@@ -55,14 +59,18 @@ export abstract class AbstractController<T = any> implements IController<T> {
             )
         }
 
+        this.updateState(newState as Partial<T & ControllerState>)
+        this.emit('stateChange', this.state)
+        this.log('State updated:', newState)
+    }
+
+    // 內部狀態更新方法，統一狀態更新邏輯
+    private updateState(newState: Partial<T & ControllerState>): void {
         this.state = {
             ...this.state,
             ...newState,
             lastUpdated: Date.now()
         }
-
-        this.emit('stateChange', this.state)
-        this.log('State updated:', newState)
     }
 
     // 生命週期管理
@@ -94,11 +102,20 @@ export abstract class AbstractController<T = any> implements IController<T> {
         }
 
         try {
+            // 🎯 關鍵修復：先設置銷毀標記，阻止後續的 setState 調用
+            this._isDestroying = true
+
+            // 現在安全地調用 onDestroy，任何 setState 都會被阻止
             this.onDestroy()
-            this.setState({ isDestroyed: true } as unknown as Partial<T>)
-            this.listeners = {} // 清理所有事件監聽器
+
+            // 最後更新狀態為已銷毀 - 使用內部更新方法
+            this.updateState({ isDestroyed: true } as Partial<T & ControllerState>)
+
             this.emit('destroyed')
             this.log('Controller destroyed')
+
+            // 清理所有事件監聽器
+            this.listeners = {}
         } catch (error) {
             const controllerError = error instanceof Error
                 ? new ControllerError(error.message, this.name, 'DESTROY_FAILED')

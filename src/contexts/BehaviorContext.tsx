@@ -1,7 +1,28 @@
-import { createContext, useContext, useReducer, useEffect, ReactNode, useRef } from 'react'
+import { createContext, useContext, useReducer, useEffect, ReactNode, useRef, useCallback, useMemo } from 'react'
 import { BehaviorController, type SuggestionStrategy } from '../controllers'
 import type { Suggestion } from '../types/suggestion'
-import type { UserEvent, BehaviorSummary } from '../types/behavior'
+import type { UserEvent } from '../types/behavior'
+
+// 節流函數
+function throttle<T extends (...args: any[]) => any>(func: T, delay: number): T {
+  let timeoutId: NodeJS.Timeout | null = null
+  let lastExecTime = 0
+  
+  return ((...args: any[]) => {
+    const currentTime = Date.now()
+    
+    if (currentTime - lastExecTime > delay) {
+      func(...args)
+      lastExecTime = currentTime
+    } else {
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        func(...args)
+        lastExecTime = Date.now()
+      }, delay - (currentTime - lastExecTime))
+    }
+  }) as T
+}
 
 // 狀態類型
 interface BehaviorState {
@@ -81,6 +102,21 @@ export function BehaviorProvider({ children }: BehaviorProviderProps) {
   const [state, dispatch] = useReducer(behaviorReducer, initialState)
   const controllerRef = useRef<BehaviorController | null>(null)
   const isUnmountedRef = useRef(false)
+  
+  // 節流的調度函數 - 減少狀態更新頻率
+  const throttledDispatch = useMemo(() => throttle((action: BehaviorAction) => {
+    if (!isUnmountedRef.current) {
+      dispatch(action)
+    }
+  }, 100), []) // 100ms 節流
+  
+  // 節流的數據更新函數
+  const throttledDataUpdate = useMemo(() => throttle(() => {
+    if (controllerRef.current && !isUnmountedRef.current) {
+      const currentData = controllerRef.current.getCurrentData()
+      throttledDispatch({ type: 'SET_CURRENT_DATA', payload: currentData })
+    }
+  }, 500), [throttledDispatch]) // 500ms 節流數據更新
 
   // 初始化控制器
   useEffect(() => {
@@ -88,132 +124,144 @@ export function BehaviorProvider({ children }: BehaviorProviderProps) {
       controllerRef.current = new BehaviorController()
       controllerRef.current.initialize()
 
-      // 監聽控制器事件
-      controllerRef.current.on('suggestionsGenerated', (suggestions: Suggestion[]) => {
+      // 監聽控制器事件 - 使用節流
+      const handleSuggestionsGenerated = throttle((suggestions: Suggestion[]) => {
         if (!isUnmountedRef.current) {
-          dispatch({ type: 'SET_SUGGESTIONS', payload: suggestions })
+          throttledDispatch({ type: 'SET_SUGGESTIONS', payload: suggestions })
         }
-      })
+      }, 200) // 200ms 節流建議更新
 
-      controllerRef.current.on('trackingStarted', (postId: string) => {
+      const handleTrackingStarted = (postId: string) => {
         if (!isUnmountedRef.current) {
-          dispatch({ type: 'SET_TRACKING', payload: true })
-          dispatch({ type: 'SET_CURRENT_POST', payload: postId })
+          throttledDispatch({ type: 'SET_TRACKING', payload: true })
+          throttledDispatch({ type: 'SET_CURRENT_POST', payload: postId })
         }
-      })
+      }
 
-      controllerRef.current.on('trackingStopped', () => {
+      const handleTrackingStopped = () => {
         if (!isUnmountedRef.current) {
-          dispatch({ type: 'SET_TRACKING', payload: false })
-          dispatch({ type: 'SET_CURRENT_POST', payload: null })
+          throttledDispatch({ type: 'SET_TRACKING', payload: false })
+          throttledDispatch({ type: 'SET_CURRENT_POST', payload: null })
         }
-      })
+      }
 
-      controllerRef.current.on('error', (error: Error) => {
+      const handleError = (error: Error) => {
         if (!isUnmountedRef.current) {
-          dispatch({ type: 'SET_ERROR', payload: error.message })
+          throttledDispatch({ type: 'SET_ERROR', payload: error.message })
         }
-      })
+      }
+
+      controllerRef.current.on('suggestionsGenerated', handleSuggestionsGenerated)
+      controllerRef.current.on('trackingStarted', handleTrackingStarted)
+      controllerRef.current.on('trackingStopped', handleTrackingStopped)
+      controllerRef.current.on('error', handleError)
     }
 
     return () => {
       isUnmountedRef.current = true
+      
+      // 清理定時器
       if (controllerRef.current && !controllerRef.current.getState().isDestroyed) {
-        controllerRef.current.stopTracking()
-          .then(() => controllerRef.current?.destroy())
-          .catch(console.error)
+        // 異步清理，避免阻塞
+        Promise.resolve().then(async () => {
+          try {
+            await controllerRef.current?.stopTracking()
+            controllerRef.current?.destroy()
+          } catch (error) {
+            console.error('Error during cleanup:', error)
+          }
+        })
       }
     }
-  }, [])
+  }, [throttledDispatch])
 
   // 開始追蹤
-  const startTracking = async (postId: string): Promise<void> => {
+  const startTracking = useCallback(async (postId: string): Promise<void> => {
     if (!controllerRef.current) return
 
-    dispatch({ type: 'SET_LOADING', payload: true })
-    dispatch({ type: 'CLEAR_ERROR' })
+    throttledDispatch({ type: 'SET_LOADING', payload: true })
+    throttledDispatch({ type: 'CLEAR_ERROR' })
 
     try {
       await controllerRef.current.startTracking(postId)
     } catch (error) {
-      dispatch({ 
+      throttledDispatch({ 
         type: 'SET_ERROR', 
         payload: error instanceof Error ? error.message : '開始追蹤失敗' 
       })
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false })
+      throttledDispatch({ type: 'SET_LOADING', payload: false })
     }
-  }
+  }, [throttledDispatch])
 
   // 停止追蹤
-  const stopTracking = async (): Promise<void> => {
+  const stopTracking = useCallback(async (): Promise<void> => {
     if (!controllerRef.current) return
 
-    dispatch({ type: 'SET_LOADING', payload: true })
+    throttledDispatch({ type: 'SET_LOADING', payload: true })
 
     try {
       await controllerRef.current.stopTracking()
-      dispatch({ type: 'SET_SUGGESTIONS', payload: [] })
-      dispatch({ type: 'SET_CURRENT_DATA', payload: null })
+      throttledDispatch({ type: 'SET_SUGGESTIONS', payload: [] })
+      throttledDispatch({ type: 'SET_CURRENT_DATA', payload: null })
     } catch (error) {
-      dispatch({ 
+      throttledDispatch({ 
         type: 'SET_ERROR', 
         payload: error instanceof Error ? error.message : '停止追蹤失敗' 
       })
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false })
+      throttledDispatch({ type: 'SET_LOADING', payload: false })
     }
-  }
+  }, [throttledDispatch])
 
-  // 添加事件
-  const addEvent = async (event: Omit<UserEvent, 'timestamp'>): Promise<void> => {
+  // 添加事件 - 使用節流減少頻率
+  const addEvent = useCallback(async (event: Omit<UserEvent, 'timestamp'>): Promise<void> => {
     if (!controllerRef.current) return
 
     try {
       await controllerRef.current.addEvent(event)
-      // 更新當前數據
-      const currentData = controllerRef.current.getCurrentData()
-      dispatch({ type: 'SET_CURRENT_DATA', payload: currentData })
+      // 使用節流的數據更新
+      throttledDataUpdate()
     } catch (error) {
-      dispatch({ 
+      throttledDispatch({ 
         type: 'SET_ERROR', 
         payload: error instanceof Error ? error.message : '添加事件失敗' 
       })
     }
-  }
+  }, [throttledDispatch, throttledDataUpdate])
 
   // 添加策略
-  const addStrategy = (strategy: SuggestionStrategy): void => {
+  const addStrategy = useCallback((strategy: SuggestionStrategy): void => {
     if (!controllerRef.current) return
     controllerRef.current.addStrategy(strategy)
-  }
+  }, [])
 
   // 執行建議
-  const executeSuggestion = async (suggestion: Suggestion): Promise<void> => {
+  const executeSuggestion = useCallback(async (suggestion: Suggestion): Promise<void> => {
     try {
       await suggestion.action()
       // 移除已執行的建議
       const newSuggestions = state.suggestions.filter(s => s.id !== suggestion.id)
-      dispatch({ type: 'SET_SUGGESTIONS', payload: newSuggestions })
+      throttledDispatch({ type: 'SET_SUGGESTIONS', payload: newSuggestions })
     } catch (error) {
-      dispatch({ 
+      throttledDispatch({ 
         type: 'SET_ERROR', 
         payload: error instanceof Error ? error.message : '執行建議失敗' 
       })
     }
-  }
+  }, [state.suggestions, throttledDispatch])
 
   // 清除錯誤
-  const clearError = (): void => {
-    dispatch({ type: 'CLEAR_ERROR' })
-  }
+  const clearError = useCallback((): void => {
+    throttledDispatch({ type: 'CLEAR_ERROR' })
+  }, [throttledDispatch])
 
   // 獲取當前數據
-  const getCurrentData = (): any => {
+  const getCurrentData = useCallback((): any => {
     return controllerRef.current?.getCurrentData() || null
-  }
+  }, [])
 
-  const contextValue: BehaviorContextType = {
+  const contextValue: BehaviorContextType = useMemo(() => ({
     ...state,
     startTracking,
     stopTracking,
@@ -222,7 +270,16 @@ export function BehaviorProvider({ children }: BehaviorProviderProps) {
     executeSuggestion,
     clearError,
     getCurrentData,
-  }
+  }), [
+    state,
+    startTracking,
+    stopTracking,
+    addEvent,
+    addStrategy,
+    executeSuggestion,
+    clearError,
+    getCurrentData
+  ])
 
   return (
     <BehaviorContext.Provider value={contextValue}>

@@ -179,28 +179,61 @@ src/
 
 ## 🔄 數據流設計
 
-### 分層數據流
+### 混合架構數據流
+我們採用**混合架構**，根據職責選擇不同的數據流路徑：
+
 ```
+// 路徑 1: 純數據操作 (CRUD)
+UI Components → Context → TanStack Query → Service
+     ↑            ↓           ↓              ↓
+   Render    State Mgmt   Caching &      Data Layer
+   Update    & Events     Fetching       Operations
+
+// 路徑 2: 複雜業務邏輯
 UI Components → Context → Controller → Service
      ↑            ↓         ↓           ↓
    Render    State Mgmt  Business   Data Layer
    Update    & Events    Logic      Operations
 ```
 
+### **架構決策原則**
+
+| 場景 | 使用路徑 | 原因 |
+|------|----------|------|
+| 簡單 CRUD 操作 | Context → TanStack Query → Service | 自動快取、錯誤處理、Loading 狀態 |
+| 複雜業務邏輯 | Context → Controller → Service | 業務邏輯協調、策略模式管理 |
+| 數據計算/篩選 | Context → Controller → Service | 需要複雜的數據處理邏輯 |
+| API 調用 | Context → TanStack Query → Service | 需要快取、重試、背景更新 |
+
 ### 實際調用流程
+
+#### **路徑 1: 數據操作流程**
+```typescript
+// 1. UI 組件使用 TanStack Query Hook
+const { data: posts, isLoading, error } = useQuery({
+  queryKey: ['posts'],
+  queryFn: () => PostService.getAllPosts(),
+  staleTime: 5 * 60 * 1000, // 5分鐘快取
+})
+
+// 2. TanStack Query 調用 Service
+const posts = await PostService.getAllPosts()
+
+// 3. Service 處理數據操作
+return await MarkdownFactory.loadAllPosts()
+```
+
+#### **路徑 2: 業務邏輯流程**
 ```typescript
 // 1. UI 組件調用 Context
-const { posts, fetchAllPosts } = usePost()
+const { getPostsByTag, getAllTags } = usePost()
 
 // 2. Context 委託給 Controller
 const postController = PostController.getInstance()
-const posts = await postController.getAllPosts()
+const filteredPosts = postController.filterPostsByTag(posts, tag)
 
-// 3. Controller 調用 Service
-const posts = await PostService.getAllPosts()
-
-// 4. Service 處理數據操作
-return await MarkdownFactory.loadAllPosts()
+// 3. Controller 執行業務邏輯
+return posts.filter(post => post.tags?.includes(tag))
 ```
 
 ### 事件驅動流程

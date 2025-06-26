@@ -32,5 +32,22 @@ export class PostService {
         }
     }
 
+    // 獲取所有標籤
+    static async getAllTags(): Promise<string[]> {
+        try {
+            const posts = await this.getAllPosts()
+            const tagSet = new Set<string>()
 
+            posts.forEach(post => {
+                if (post.tags) {
+                    post.tags.forEach(tag => tagSet.add(tag))
+                }
+            })
+
+            return Array.from(tagSet).sort()
+        } catch (error) {
+            console.error('Failed to get all tags:', error)
+            return []
+        }
+    }
 } 

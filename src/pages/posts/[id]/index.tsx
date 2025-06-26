@@ -4,13 +4,21 @@ import { usePost } from '../../../contexts/PostContext'
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>()
-  const { currentPost, isLoading, error, fetchPostById } = usePost()
+  const { 
+    usePostQuery, 
+    setCurrentPost, 
+    getRecommendedPosts, 
+    posts 
+  } = usePost()
+  
+  // 使用 TanStack Query 獲取文章數據
+  const { post, isLoading, error } = usePostQuery(id || '')
   
   useEffect(() => {
-    if (id) {
-      fetchPostById(id)
+    if (post) {
+      setCurrentPost(post) // 設置當前文章到 Controller
     }
-  }, [id])
+  }, [post, setCurrentPost])
   
   if (!id) {
     return <Navigate to="/posts" replace />
@@ -26,12 +34,14 @@ export default function PostDetail() {
     )
   }
   
-  if (error || !currentPost) {
+  if (error || !post) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">文章不存在</h1>
-          <p className="text-gray-600 mb-6">抱歉，找不到您要查看的文章。</p>
+          <p className="text-gray-600 mb-6">
+            {error ? `載入錯誤: ${error.message}` : '抱歉，找不到您要查看的文章。'}
+          </p>
           <Link 
             to="/posts"
             className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -42,6 +52,9 @@ export default function PostDetail() {
       </div>
     )
   }
+
+  // 獲取推薦文章 (複雜業務邏輯)
+  const recommendedPosts = posts.length > 0 ? getRecommendedPosts(post, 3) : []
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -60,16 +73,16 @@ export default function PostDetail() {
 
       {/* 文章標題和元數據 */}
       <header className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{currentPost.title}</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
         
         <div className="flex items-center gap-4 text-gray-600 text-sm mb-4">
-          <span>發布日期: {currentPost.date}</span>
-          {currentPost.author && <span>作者: {currentPost.author}</span>}
+          <span>發布日期: {post.date}</span>
+          {post.author && <span>作者: {post.author}</span>}
         </div>
         
-        {currentPost.tags && currentPost.tags.length > 0 && (
+        {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {currentPost.tags.map((tag: string) => (
+            {post.tags.map((tag: string) => (
               <span 
                 key={tag}
                 className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
@@ -83,14 +96,50 @@ export default function PostDetail() {
 
       {/* 文章內容 */}
       <article className="prose prose-lg max-w-none">
-        {currentPost.component ? (
-          <currentPost.component />
+        {post.component ? (
+          <post.component />
         ) : (
           <div className="text-gray-500">
             <p>文章內容載入失敗</p>
           </div>
         )}
       </article>
+
+      {/* 推薦文章 */}
+      {recommendedPosts.length > 0 && (
+        <section className="mt-12 pt-8 border-t border-gray-200">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">推薦文章</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {recommendedPosts.map(recommendedPost => (
+              <div key={recommendedPost.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <h3 className="font-semibold mb-2">
+                  <Link 
+                    to={`/posts/${recommendedPost.id}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {recommendedPost.title}
+                  </Link>
+                </h3>
+                <div className="text-gray-600 text-sm mb-2">
+                  {recommendedPost.date}
+                </div>
+                {recommendedPost.tags && (
+                  <div className="flex flex-wrap gap-1">
+                    {recommendedPost.tags.slice(0, 3).map(tag => (
+                      <span 
+                        key={tag}
+                        className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 返回按鈕 */}
       <div className="mt-12 pt-8 border-t border-gray-200">
