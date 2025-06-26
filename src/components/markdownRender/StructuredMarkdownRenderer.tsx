@@ -1,12 +1,14 @@
-import { useEffect } from 'react'
-import type { Post } from '@/types/post'
+import { useEffect, useState } from 'react'
+import type { Post, PostInteraction } from '@/types/post'
 import { useTextSelection } from '@/hooks/useTextSelection'
 import { usePostInteractions } from '@/hooks/usePostInteractions'
 import { useInteractionDialogs } from '@/hooks/useInteractionDialogs'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useTextMarking } from '@/hooks/useTextMarking'
 import { InteractionMenu } from './InteractionMenu'
 import { InteractionDialogs } from './InteractionDialogs'
 import { InteractionsList } from './InteractionsList'
+import { CommentPopover } from './CommentPopover'
 
 interface StructuredMarkdownRendererProps {
   post: Post
@@ -17,6 +19,9 @@ interface StructuredMarkdownRendererProps {
  * 使用多個專門的 hooks 和組件，職責分離
  */
 export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererProps) {
+  // Comment 彈出框狀態
+  const [selectedComment, setSelectedComment] = useState<PostInteraction | null>(null)
+
   // 文字選擇邏輯
   const {
     selectedText,
@@ -32,9 +37,15 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
     interactions,
     addMark,
     addComment,
-    addReply,
-    getMarkStyles
+    addReply
   } = usePostInteractions(post)
+
+  // 文字標記邏輯
+  useTextMarking({
+    interactions,
+    contentRef,
+    onCommentClick: setSelectedComment
+  })
 
   // 對話框狀態管理
   const {
@@ -116,10 +127,7 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
         className="prose prose-lg max-w-none select-text relative"
         style={{ userSelect: 'text' }}
       >
-        {/* 動態標記樣式 */}
-        {getMarkStyles() && (
-          <style dangerouslySetInnerHTML={{ __html: getMarkStyles() }} />
-        )}
+        {/* 文字標記會通過 useTextMarking hook 直接應用到 DOM */}
         
         {/* 文章內容 */}
         {post.component ? (
@@ -165,6 +173,12 @@ export function StructuredMarkdownRenderer({ post }: StructuredMarkdownRendererP
         onReplyTextChange={setReplyText}
         onReplySubmit={handleReplySubmit}
         onReplyCancel={closeReplyDialog}
+      />
+
+      {/* Comment 彈出框 */}
+      <CommentPopover
+        interaction={selectedComment}
+        onClose={() => setSelectedComment(null)}
       />
     </div>
   )

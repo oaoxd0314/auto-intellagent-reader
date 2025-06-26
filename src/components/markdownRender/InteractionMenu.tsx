@@ -20,8 +20,7 @@ export function InteractionMenu({ show, position, onMark, onComment }: Interacti
       )}
       style={{
         left: position.left - menuWidth / 2,
-        top: position.top - 10,
-        transform: 'translateY(-100%)',
+        top: position.top,
       }}
     >
       <div className="flex items-center gap-1">

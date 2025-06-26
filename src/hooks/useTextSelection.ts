@@ -94,7 +94,7 @@ export function useTextSelection(): UseTextSelectionReturn {
     }, [])
 
     /**
-     * 計算選單位置
+     * 計算選單位置 - 出現在選取文字中間點的下方
      */
     const calculateMenuPosition = useCallback((range: Range) => {
         const rects = range.getClientRects()
@@ -102,14 +102,14 @@ export function useTextSelection(): UseTextSelectionReturn {
 
         let leftMost = Infinity
         let rightMost = -Infinity
-        let topMost = Infinity
+        let bottomMost = -Infinity
 
         for (let i = 0; i < rects.length; i++) {
             const r = rects[i]
             if (r.width > 0) {
                 leftMost = Math.min(leftMost, r.left)
                 rightMost = Math.max(rightMost, r.right)
-                topMost = Math.min(topMost, r.top)
+                bottomMost = Math.max(bottomMost, r.bottom)
             }
         }
 
@@ -117,8 +117,8 @@ export function useTextSelection(): UseTextSelectionReturn {
         if (!containerRect) return null
 
         return {
-            left: (leftMost + rightMost) / 2 - containerRect.left,
-            top: topMost - containerRect.top
+            left: (leftMost + rightMost) / 2 - containerRect.left, // 水平中間點
+            top: bottomMost - containerRect.top + 8 // 文字下方 8px
         }
     }, [])
 
