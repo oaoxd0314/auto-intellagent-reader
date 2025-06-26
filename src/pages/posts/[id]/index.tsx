@@ -10,7 +10,7 @@ export default function PostDetail() {
     if (id) {
       fetchPostById(id)
     }
-  }, [id, fetchPostById])
+  }, [id])
   
   if (!id) {
     return <Navigate to="/posts" replace />

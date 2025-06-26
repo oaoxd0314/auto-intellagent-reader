@@ -34,6 +34,4 @@ export const routeMap = {
   '/': '首頁',
   '/about': '關於',
   '/posts': '文章',
-  '/reader': '閱讀器',
-  '/test-controller': '控制器測試',
 } 
