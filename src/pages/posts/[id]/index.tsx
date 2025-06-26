@@ -1,7 +1,7 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { usePost } from '../../../contexts/PostContext'
-import { StructuredMarkdownRenderer } from '../../../components/StructuredMarkdownRenderer'
+import { StructuredMarkdownRenderer } from '@/components/markdownRender/StructuredMarkdownRenderer'
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>()
