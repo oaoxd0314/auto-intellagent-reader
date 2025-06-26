@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
-import type { Post, PostInteraction, TextPosition } from '../types/post'
-import { PostController } from '../controllers/PostController'
+import type { Post, PostInteraction, TextPosition } from '../../../../../types/post'
+import { PostController } from '../../../../../controllers/PostController'
 
 export interface UsePostInteractionsReturn {
     interactions: PostInteraction[]
     addMark: (postId: string, text: string, position: TextPosition) => void
     addComment: (postId: string, text: string, comment: string, position: TextPosition) => void
     addReply: (postId: string, content: string) => void
+    removeInteraction: (interactionId: string) => void
 }
 
-export function usePostInteractions(post: Post): UsePostInteractionsReturn {
+export function usePostInteractions(post: Post | undefined): UsePostInteractionsReturn {
     const [interactions, setInteractions] = useState<PostInteraction[]>([])
     const postController = PostController.getInstance()
 
@@ -17,9 +18,11 @@ export function usePostInteractions(post: Post): UsePostInteractionsReturn {
      * 加載互動記錄
      */
     useEffect(() => {
+        if (!post) return
+
         postController.loadInteractions()
         setInteractions(postController.getInteractions(post.id))
-    }, [post.id, postController])
+    }, [post?.id, postController])
 
     /**
      * 添加標記
@@ -45,10 +48,21 @@ export function usePostInteractions(post: Post): UsePostInteractionsReturn {
         setInteractions(postController.getInteractions(postId))
     }
 
+    /**
+     * 刪除互動記錄
+     */
+    const removeInteraction = (interactionId: string) => {
+        if (!post) return
+
+        postController.removeInteraction(interactionId)
+        setInteractions(postController.getInteractions(post.id))
+    }
+
     return {
         interactions,
         addMark,
         addComment,
-        addReply
+        addReply,
+        removeInteraction
     }
 } 

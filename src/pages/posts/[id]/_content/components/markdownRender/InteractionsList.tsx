@@ -1,4 +1,4 @@
-import type { PostInteraction } from '../../types/post'
+import type { PostInteraction } from '../../../../../../types/post'
 
 export interface InteractionsListProps {
   interactions: PostInteraction[]

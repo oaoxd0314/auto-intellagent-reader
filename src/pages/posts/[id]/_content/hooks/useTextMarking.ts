@@ -1,13 +1,14 @@
 import { useEffect, useCallback } from 'react'
-import type { PostInteraction } from '../types/post'
+import type { PostInteraction } from '../../../../../types/post'
 
 interface UseTextMarkingProps {
     interactions: PostInteraction[]
     contentRef: React.RefObject<HTMLDivElement | null>
     onCommentClick: (interaction: PostInteraction) => void
+    onHighlightClick: (interaction: PostInteraction) => void
 }
 
-export function useTextMarking({ interactions, contentRef, onCommentClick }: UseTextMarkingProps) {
+export function useTextMarking({ interactions, contentRef, onCommentClick, onHighlightClick }: UseTextMarkingProps) {
 
     /**
  * 創建 comment 圖標元素
@@ -84,6 +85,12 @@ export function useTextMarking({ interactions, contentRef, onCommentClick }: Use
         }
 
         highlightSpan.setAttribute('data-interaction-id', interaction.id)
+
+        // 添加點擊事件
+        highlightSpan.addEventListener('click', (e) => {
+            e.stopPropagation()
+            onHighlightClick(interaction)
+        })
 
         // 替換範圍內容
         range.deleteContents()

@@ -1,7 +1,14 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePost } from '../../../contexts/PostContext'
-import { StructuredMarkdownRenderer } from '@/components/markdownRender/StructuredMarkdownRenderer'
+import { StructuredMarkdownRenderer } from './_content/components/markdownRender/StructuredMarkdownRenderer'
+import { usePostInteractions } from './_content/hooks/usePostInteractions'
+import { useInteractionDialogs } from './_content/hooks/useInteractionDialogs'
+import { InteractionsList } from './_content/components/markdownRender/InteractionsList'
+import { InteractionDialogs } from './_content/components/markdownRender/InteractionDialogs'
+import { CommentPopover } from './_content/components/markdownRender/CommentPopover'
+import { HighlightPopover } from './_content/components/markdownRender/HighlightPopover'
+import type { PostInteraction } from '../../../types/post'
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>()
@@ -12,14 +19,49 @@ export default function PostDetail() {
     posts 
   } = usePost()
   
+  // Comment 和 Highlight 彈出框狀態
+  const [selectedComment, setSelectedComment] = useState<PostInteraction | null>(null)
+  const [selectedHighlight, setSelectedHighlight] = useState<PostInteraction | null>(null)
+  
   // 使用 TanStack Query 獲取文章數據
   const { post, isLoading, error } = usePostQuery(id || '')
+  
+  // 互動功能邏輯
+  const {
+    interactions,
+    addMark,
+    addComment,
+    addReply,
+    removeInteraction
+  } = usePostInteractions(post)
+
+  // 對話框狀態管理
+  const {
+    showCommentDialog,
+    commentText,
+    setCommentText,
+    openCommentDialog,
+    closeCommentDialog,
+    showReplyDialog,
+    replyText,
+    setReplyText,
+    openReplyDialog,
+    closeReplyDialog
+  } = useInteractionDialogs()
   
   useEffect(() => {
     if (post) {
       setCurrentPost(post) // 設置當前文章到 Controller
     }
   }, [post, setCurrentPost])
+  
+  // 提交回覆
+  const handleReplySubmit = () => {
+    if (replyText.trim() && post) {
+      addReply(post.id, replyText)
+      closeReplyDialog()
+    }
+  }
   
   if (!id) {
     return <Navigate to="/posts" replace />
@@ -97,10 +139,38 @@ export default function PostDetail() {
 
       {/* 文章內容 - 使用結構化渲染器 */}
       <article>
-                <StructuredMarkdownRenderer 
-          post={post}
-        />
+          <StructuredMarkdownRenderer 
+            post={post} 
+            interactions={interactions}
+            onCommentClick={setSelectedComment}
+            onHighlightClick={setSelectedHighlight}
+            onMark={addMark}
+            onComment={openCommentDialog}
+            commentText={commentText}
+            onCommentTextChange={setCommentText}
+            onCommentSubmit={(selectedText, position) => {
+              if (commentText.trim() && post) {
+                addComment(post.id, selectedText, commentText, position)
+                closeCommentDialog()
+              }
+            }}
+            onCommentCancel={closeCommentDialog}
+            showCommentDialog={showCommentDialog}
+          />
       </article>
+
+      {/* 回覆按鈕 */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <button
+          onClick={openReplyDialog}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          💬 回覆文章
+        </button>
+      </div>
+
+      {/* 互動記錄 */}
+      {post && <InteractionsList interactions={interactions} postId={post.id} />}
 
       {/* 推薦文章 */}
       {recommendedPosts.length > 0 && (
@@ -147,6 +217,34 @@ export default function PostDetail() {
           返回文章列表
         </Link>
       </div>
+
+      {/* 對話框 */}
+      <InteractionDialogs
+        showCommentDialog={false} // 評論對話框由 StructuredMarkdownRenderer 處理
+        commentText=""
+        selectedText=""
+        onCommentTextChange={() => {}}
+        onCommentSubmit={() => {}}
+        onCommentCancel={() => {}}
+        showReplyDialog={showReplyDialog}
+        replyText={replyText}
+        onReplyTextChange={setReplyText}
+        onReplySubmit={handleReplySubmit}
+        onReplyCancel={closeReplyDialog}
+      />
+
+      {/* Comment 彈出框 */}
+      <CommentPopover
+        interaction={selectedComment}
+        onClose={() => setSelectedComment(null)}
+      />
+
+      {/* Highlight 彈出框 */}
+      <HighlightPopover
+        interaction={selectedHighlight}
+        onClose={() => setSelectedHighlight(null)}
+        onRemove={removeInteraction}
+      />
     </div>
   )
 } 

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import type { TextPosition } from '../types/post'
+import type { TextPosition } from '../../../../../types/post'
 
 export interface UseTextSelectionReturn {
     selectedText: string
