@@ -42,6 +42,9 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
             return
         }
 
+        // 先清除舊的覆蓋層，但保留原生選擇讓用戶可以繼續選擇
+        TextSelectionService.clearSelectionOverlay()
+
         // 創建視覺覆蓋層
         const overlayElements = TextSelectionService.createSelectionOverlay({
             rects: selectionResult.rects,
@@ -68,8 +71,7 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
             selectionContext.showMenu(menuPosition)
         }
 
-        // 清除瀏覽器原生選擇
-        TextSelectionService.clearNativeSelection()
+        // 不要立即清除原生選擇，讓用戶可以繼續選擇新的範圍
     }, [selectionContext])
 
     /**
@@ -82,6 +84,7 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
         }
         selectionContext.clearSelection()
         TextSelectionService.clearSelectionOverlay()
+        TextSelectionService.clearNativeSelection() // 操作完成後清除原生選擇
     }, [onMark, selectionContext])
 
     /**
@@ -94,6 +97,7 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
         }
         selectionContext.clearSelection()
         TextSelectionService.clearSelectionOverlay()
+        TextSelectionService.clearNativeSelection() // 操作完成後清除原生選擇
     }, [onComment, selectionContext])
 
     /**
@@ -102,8 +106,18 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
     const clearSelection = useCallback(() => {
         selectionContext.clearSelection()
         TextSelectionService.clearSelectionOverlay()
-        TextSelectionService.clearNativeSelection()
+        TextSelectionService.clearNativeSelection() // 手動清除時清除原生選擇
     }, [selectionContext])
+
+    // 初始化時隱藏原生選擇
+    useEffect(() => {
+        TextSelectionService.hideNativeSelection()
+
+        return () => {
+            TextSelectionService.showNativeSelection()
+            TextSelectionService.clearSelectionOverlay()
+        }
+    }, [])
 
     // 事件處理
     useEffect(() => {
@@ -156,13 +170,6 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
             window.removeEventListener('scroll', handleScroll, true)
         }
     }, [handleTextSelection, clearSelection, selectionContext.isMenuVisible, selectionContext.selectedText, excludeSelectors, debounceMs])
-
-    // 清理效果
-    useEffect(() => {
-        return () => {
-            TextSelectionService.clearSelectionOverlay()
-        }
-    }, [])
 
     return {
         contentRef,

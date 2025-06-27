@@ -63,7 +63,7 @@ export class TextSelectionService {
     }
 
     /**
-     * 穩定化選擇範圍 - 修正邊界問題
+     * 穩定化選擇範圍 - 修正邊界問題，限制在文字層級
      */
     private static stabilizeRange(range: Range): Range | null {
         try {
@@ -72,6 +72,9 @@ export class TextSelectionService {
             if (clonedRange.collapsed || clonedRange.toString().trim().length === 0) {
                 return null
             }
+
+            // 確保選擇範圍只在文字節點內，不會擴展到元素邊界
+            this.constrainRangeToTextNodes(clonedRange)
 
             // 處理開始位置 - 跳過空白字元
             let startContainer = clonedRange.startContainer
@@ -103,6 +106,60 @@ export class TextSelectionService {
             console.warn('Range stabilization failed:', error)
             return range
         }
+    }
+
+    /**
+     * 限制選擇範圍只在文字節點內
+     */
+    private static constrainRangeToTextNodes(range: Range): void {
+        // 確保開始位置在文字節點內
+        if (range.startContainer.nodeType !== Node.TEXT_NODE) {
+            const textNode = this.findFirstTextNode(range.startContainer)
+            if (textNode) {
+                range.setStart(textNode, 0)
+            }
+        }
+
+        // 確保結束位置在文字節點內
+        if (range.endContainer.nodeType !== Node.TEXT_NODE) {
+            const textNode = this.findLastTextNode(range.endContainer)
+            if (textNode) {
+                range.setEnd(textNode, textNode.textContent?.length || 0)
+            }
+        }
+    }
+
+    /**
+     * 尋找第一個文字節點
+     */
+    private static findFirstTextNode(node: Node): Text | null {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return node as Text
+        }
+
+        for (let child of Array.from(node.childNodes)) {
+            const textNode = this.findFirstTextNode(child)
+            if (textNode) return textNode
+        }
+
+        return null
+    }
+
+    /**
+     * 尋找最後一個文字節點
+     */
+    private static findLastTextNode(node: Node): Text | null {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return node as Text
+        }
+
+        const children = Array.from(node.childNodes)
+        for (let i = children.length - 1; i >= 0; i--) {
+            const textNode = this.findLastTextNode(children[i])
+            if (textNode) return textNode
+        }
+
+        return null
     }
 
     /**
@@ -201,23 +258,70 @@ export class TextSelectionService {
     }
 
     /**
+     * 隱藏原生選擇的視覺效果，但保留選擇功能
+     */
+    static hideNativeSelection(): void {
+        const style = document.getElementById('hide-native-selection')
+        if (!style) {
+            const styleElement = document.createElement('style')
+            styleElement.id = 'hide-native-selection'
+            styleElement.textContent = `
+                html *, html *::selection, html *::-moz-selection {
+                    background: transparent !important;
+                    color: inherit !important;
+                }
+                
+                /* 更強的選擇器 */
+                html body *, 
+                html body *::selection, 
+                html body *::-moz-selection,
+                [data-selection-disabled] *::selection,
+                [data-selection-disabled] *::-moz-selection {
+                    background: transparent !important;
+                    color: inherit !important;
+                    text-shadow: none !important;
+                }
+            `
+            document.head.appendChild(styleElement)
+
+            // 添加 data 屬性到 body
+            document.body.setAttribute('data-selection-disabled', 'true')
+        }
+    }
+
+    /**
+     * 恢復原生選擇的視覺效果
+     */
+    static showNativeSelection(): void {
+        const style = document.getElementById('hide-native-selection')
+        if (style) {
+            style.remove()
+        }
+        // 移除 data 屬性
+        document.body.removeAttribute('data-selection-disabled')
+    }
+
+    /**
      * 計算選單位置
      */
     static calculateMenuPosition(
         rects: DOMRect[],
         containerElement: HTMLElement,
-        menuWidth = 180
+        menuWidth = 180,
+        menuHeight = 40
     ): { left: number; top: number } | null {
         if (rects.length === 0) return null
 
         let leftMost = Infinity
         let rightMost = -Infinity
+        let topMost = Infinity
         let bottomMost = -Infinity
 
         for (const rect of rects) {
             if (rect.width > 0) {
                 leftMost = Math.min(leftMost, rect.left)
                 rightMost = Math.max(rightMost, rect.right)
+                topMost = Math.min(topMost, rect.top)
                 bottomMost = Math.max(bottomMost, rect.bottom)
             }
         }
@@ -225,11 +329,13 @@ export class TextSelectionService {
         const containerRect = containerElement.getBoundingClientRect()
         const centerX = (leftMost + rightMost) / 2
         const relativeLeft = centerX - containerRect.left - menuWidth / 2
-        const relativeTop = bottomMost - containerRect.top + 8
+
+        // 將選單放在選擇文字的上方，留 8px 間距
+        const relativeTop = topMost - containerRect.top - menuHeight - 8
 
         return {
             left: Math.max(0, Math.min(relativeLeft, containerRect.width - menuWidth)),
-            top: relativeTop
+            top: Math.max(0, relativeTop) // 確保不會超出容器頂部
         }
     }
 
