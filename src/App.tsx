@@ -3,11 +3,13 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { routes } from './router/routes'
 import Navigation from './components/Navigation'
 import { PostProvider } from './contexts/PostContext'
+import { InteractionProvider } from './contexts/InteractionContext'
 
 function App() {
   return (
     <PostProvider>
-      <Router>
+      <InteractionProvider>
+        <Router>
         <div className="min-h-screen bg-background">
           <Navigation />
           <Suspense fallback={
@@ -27,6 +29,7 @@ function App() {
           </Suspense>
         </div>
       </Router>
+      </InteractionProvider>
     </PostProvider>
   )
 }

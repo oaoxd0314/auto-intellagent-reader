@@ -1,5 +1,5 @@
 import { AbstractController } from './AbstractController'
-import type { Post } from '../types/post'
+import type { Post, PostInteraction, TextPosition } from '../types/post'
 
 /**
  * 文章控制器狀態
@@ -11,6 +11,7 @@ interface PostControllerState {
         searchTerm?: string
     }
     viewMode: 'list' | 'grid' | 'detail'
+    interactions: PostInteraction[]
 }
 
 /**
@@ -25,7 +26,8 @@ export class PostController extends AbstractController<PostControllerState> {
         super('PostController', {
             currentPost: null,
             searchFilters: {},
-            viewMode: 'list'
+            viewMode: 'list',
+            interactions: []
         }, {
             enableLogging: true,
             debugMode: false
@@ -254,6 +256,212 @@ export class PostController extends AbstractController<PostControllerState> {
     }
 
     /**
+     * 添加文章回覆
+     */
+    addReply(postId: string, content: string): void {
+        if (this.state.isDestroyed) return
+
+        const interaction: PostInteraction = {
+            id: `reply-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            postId,
+            type: 'reply',
+            content,
+            timestamp: new Date().toISOString()
+        }
+
+        this.setState({
+            interactions: [...this.state.interactions, interaction]
+        })
+
+        // 持久化到 localStorage
+        this.saveInteractions()
+        this.emit('interactionAdded', interaction)
+    }
+
+    /**
+     * 添加文字標記
+     */
+    addMark(postId: string, selectedText: string, position: TextPosition): void {
+        if (this.state.isDestroyed) return
+
+        const interaction: PostInteraction = {
+            id: `mark-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            postId,
+            type: 'mark',
+            content: '標記',
+            selectedText,
+            position,
+            timestamp: new Date().toISOString()
+        }
+
+        this.setState({
+            interactions: [...this.state.interactions, interaction]
+        })
+
+        this.saveInteractions()
+        this.emit('interactionAdded', interaction)
+    }
+
+    /**
+     * 添加文字評論
+     */
+    addComment(postId: string, selectedText: string, comment: string, position: TextPosition): void {
+        if (this.state.isDestroyed) return
+
+        const interaction: PostInteraction = {
+            id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            postId,
+            type: 'comment',
+            content: comment,
+            selectedText,
+            position,
+            timestamp: new Date().toISOString()
+        }
+
+        this.setState({
+            interactions: [...this.state.interactions, interaction]
+        })
+
+        this.saveInteractions()
+        this.emit('interactionAdded', interaction)
+    }
+
+    /**
+     * 獲取指定文章的互動記錄
+     */
+    getInteractions(postId: string): PostInteraction[] {
+        return this.state.interactions.filter(interaction => interaction.postId === postId)
+    }
+
+    /**
+     * 獲取所有互動記錄
+     */
+    getAllInteractions(): PostInteraction[] {
+        return [...this.state.interactions]
+    }
+
+    /**
+     * 刪除互動記錄
+     */
+    removeInteraction(interactionId: string): void {
+        if (this.state.isDestroyed) return
+
+        this.setState({
+            interactions: this.state.interactions.filter(i => i.id !== interactionId)
+        })
+
+        this.saveInteractions()
+        this.emit('interactionRemoved', interactionId)
+    }
+
+    /**
+     * 清除指定文章的所有互動記錄
+     */
+    clearInteractions(postId: string): void {
+        if (this.state.isDestroyed) return
+
+        this.setState({
+            interactions: this.state.interactions.filter(i => i.postId !== postId)
+        })
+
+        this.saveInteractions()
+        this.emit('interactionsCleared', postId)
+    }
+
+    /**
+     * 保存互動記錄到 localStorage
+     */
+    private saveInteractions(): void {
+        try {
+            localStorage.setItem('post-interactions', JSON.stringify(this.state.interactions))
+        } catch (error) {
+            this.log('Failed to save interactions to localStorage', error)
+        }
+    }
+
+    /**
+     * 從 localStorage 載入互動記錄
+     */
+    loadInteractions(): void {
+        if (this.state.isDestroyed) return
+
+        try {
+            const saved = localStorage.getItem('post-interactions')
+            if (saved) {
+                const interactions = JSON.parse(saved) as PostInteraction[]
+
+                // 開發模式下，清理可能過時的互動記錄
+                if (process.env.NODE_ENV === 'development') {
+                    const now = Date.now()
+                    const filteredInteractions = interactions.filter(interaction => {
+                        const interactionTime = new Date(interaction.timestamp).getTime()
+                        // 只保留最近 1 小時內的互動記錄，避免 hot reload 導致的位置錯亂
+                        return now - interactionTime < 60 * 60 * 1000
+                    })
+
+                    if (filteredInteractions.length !== interactions.length) {
+                        this.setState({ interactions: filteredInteractions })
+                        this.saveInteractions()
+                        this.log('Cleaned up outdated interactions in dev mode')
+                        return
+                    }
+                }
+
+                this.setState({ interactions })
+                this.emit('interactionsLoaded', interactions)
+            }
+        } catch (error) {
+            this.log('Failed to load interactions from localStorage', error)
+        }
+    }
+
+    /**
+     * 獲取互動統計
+     */
+    getInteractionStats(postId?: string): {
+        totalInteractions: number
+        replies: number
+        marks: number
+        comments: number
+        byPost?: Record<string, number>
+    } {
+        const interactions = postId
+            ? this.getInteractions(postId)
+            : this.state.interactions
+
+        const stats = {
+            totalInteractions: interactions.length,
+            replies: interactions.filter(i => i.type === 'reply').length,
+            marks: interactions.filter(i => i.type === 'mark').length,
+            comments: interactions.filter(i => i.type === 'comment').length
+        }
+
+        if (!postId) {
+            // 按文章統計
+            const byPost: Record<string, number> = {}
+            this.state.interactions.forEach(interaction => {
+                byPost[interaction.postId] = (byPost[interaction.postId] || 0) + 1
+            })
+            return { ...stats, byPost }
+        }
+
+        return stats
+    }
+
+    /**
+     * 清理所有 localStorage 中的互動記錄（開發用）
+     */
+    clearAllStoredInteractions(): void {
+        try {
+            localStorage.removeItem('post-interactions')
+            this.setState({ interactions: [] })
+            this.log('Cleared all stored interactions')
+        } catch (error) {
+            this.log('Failed to clear stored interactions', error)
+        }
+    }
+
+    /**
      * 獲取當前狀態的快照
      */
     getSnapshot() {
@@ -261,7 +469,9 @@ export class PostController extends AbstractController<PostControllerState> {
             currentPost: this.state.currentPost ? { ...this.state.currentPost } : null,
             searchFilters: { ...this.state.searchFilters },
             viewMode: this.state.viewMode,
-            readingHistory: this.getReadingHistory()
+            interactions: [...this.state.interactions],
+            readingHistory: this.getReadingHistory(),
+            interactionStats: this.getInteractionStats()
         }
     }
 } 
