@@ -7,7 +7,7 @@
 3. **/posts/:id** - 顯示指定文章 ✅
 4. **結構化互動** - 文字選擇、標記、評論功能 ✅
 
-**🎉 所有核心功能已完成！新增互動功能完成！**
+**🎉 所有核心功能已完成！新增互動功能完成！新增互動統計系統完成！**
 
 ## ✅ 已完成功能
 
@@ -15,6 +15,10 @@
 - **文章列表頁面** (`src/pages/posts/index.tsx`)
   - 顯示所有文章卡片
   - 標題、日期、作者、標籤顯示
+  - **新增：互動統計顯示** ✅
+    - 段落評論數量
+    - 標記數量
+    - 回覆數量
   - 點擊跳轉到詳情頁
   - 異步載入支援
   - 載入狀態提示
@@ -101,6 +105,12 @@ getInteractionStats(postId?: string): InteractionStats
 removeInteraction(interactionId: string): void
 clearInteractions(postId: string): void
 loadInteractions(): void // 從 localStorage 載入
+
+// 新增：事件系統 ✅
+emit(event: 'interactionAdded', interaction: PostInteraction): void
+emit(event: 'interactionRemoved', interactionId: string): void
+on(event: string, callback: Function): void
+off(event: string, callback: Function): void
 ```
 
 **數據持久化：**
@@ -133,14 +143,115 @@ loadInteractions(): void // 從 localStorage 載入
 - 優雅的對話框設計
 - 清晰的互動記錄展示
 
+### 4. 新增：互動統計系統 ✅
+
+#### 4.1 InteractionContext 全域狀態管理
+**位置：** `src/contexts/InteractionContext.tsx`
+
+**功能：**
+- 全域互動數據管理
+- 實時統計計算
+- 事件驅動更新
+- 智能快取機制
+
+**提供的 API：**
+```typescript
+interface InteractionContextType {
+  // 狀態
+  interactions: PostInteraction[]
+  statsByPost: PostInteractionStats
+  isLoading: boolean
+  error: string | null
+  
+  // 統計方法
+  getPostStats: (postId: string) => InteractionStats
+  getTotalStats: () => InteractionStats
+  
+  // 操作方法
+  refreshInteractions: () => void
+  clearError: () => void
+}
+```
+
+#### 4.2 InteractionStats 組件
+**位置：** `src/components/InteractionStats.tsx`
+
+**功能：**
+- 顯示單個文章的互動統計
+- 響應式設計（sm/md/lg）
+- 載入狀態處理
+- 空狀態處理
+
+**使用方式：**
+```typescript
+<InteractionStats 
+  postId={post.id} 
+  size="sm" 
+  showEmpty={false} 
+/>
+```
+
+#### 4.3 Provider 架構改進
+**App.tsx 結構：**
+```typescript
+<PostProvider>
+  <InteractionProvider>
+    <Router>
+      // 應用內容
+    </Router>
+  </InteractionProvider>
+</PostProvider>
+```
+
+**架構優勢：**
+- 分離關注點：文章數據 vs 互動統計
+- 獨立快取策略
+- 更好的錯誤隔離
+- 可測試性提升
+
+#### 4.4 事件驅動更新系統
+**PostController 事件：**
+```typescript
+// 新增互動時自動觸發
+postController.emit('interactionAdded', interaction)
+postController.emit('interactionRemoved', interactionId)
+
+// InteractionContext 自動監聽並更新統計
+```
+
+**實時同步：**
+- 添加互動 → 立即更新統計
+- 刪除互動 → 立即更新統計
+- 跨組件自動同步
+- 無需手動刷新
+
 ## 🏗️ 完整技術架構
 
 ### 資料流架構
 ```
-Pages → PostProvider (Context) → PostService → MarkdownFactory → MDX Files
-  ↓           ↓                      ↓             ↓               ↓
-UI組件    狀態管理+快取           業務服務層      核心邏輯        數據源
+                    App Level
+                 ┌─────────────┐
+                 │ PostProvider │
+                 │InteractionProvider│
+                 └─────────────┘
+                       │
+            ┌──────────┼──────────┐
+            ▼          ▼          ▼
+        Pages    UI Components  Services
+         │           │           │
+         ▼           ▼           ▼
+    路由管理      互動統計     PostService
+                 顯示組件      MarkdownFactory
+                             │
+                             ▼
+                         MDX Files
 ```
+
+**雙重 Provider 架構：**
+- **PostProvider** - 文章數據管理
+- **InteractionProvider** - 互動統計管理
+- **獨立快取** - 各自管理生命週期
+- **事件同步** - Controller 事件驅動更新
 
 ### 1. 狀態管理層 ✅
 **已實作：** 使用 useReducer 的全域狀態管理
