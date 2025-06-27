@@ -1,40 +1,58 @@
 import type { PostInteraction } from '../../../../../../types/post'
 
-export interface InteractionsListProps {
-  interactions: PostInteraction[]
+export interface ReplyListProps {
+  interactions: PostInteraction[] // 現在這裡只會是 reply 類型的互動
   postId: string
+  onRemoveReply?: (replyId: string) => void
 }
 
-export function InteractionsList({ interactions, postId }: InteractionsListProps) {
-  const postInteractions = interactions.filter((i: PostInteraction) => i.postId === postId)
-  
-  if (postInteractions.length === 0) return null
+export function ReplyList({ interactions: replies, postId, onRemoveReply }: ReplyListProps) {
+  if (replies.length === 0) {
+    return (
+      <div className="mt-8 pt-6 border-t border-gray-200">
+        <h3 className="text-lg font-semibold mb-4">回覆留言</h3>
+        <p className="text-gray-500 text-sm">目前還沒有回覆留言</p>
+      </div>
+    )
+  }
 
   return (
     <div className="mt-8 pt-6 border-t border-gray-200">
-      <h3 className="text-lg font-semibold mb-4">互動記錄</h3>
+      <h3 className="text-lg font-semibold mb-4">
+        回覆留言 ({replies.length})
+      </h3>
       <div className="space-y-4">
-        {postInteractions.map((interaction: PostInteraction) => (
-          <div key={interaction.id} className="border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-medium">
-                {interaction.type === 'reply' && '💬 回覆'}
-                {interaction.type === 'mark' && '🔖 標記'}
-                {interaction.type === 'comment' && '💭 評論'}
-              </span>
-              <span className="text-xs text-gray-500">
-                {new Date(interaction.timestamp).toLocaleString()}
-              </span>
+        {replies.map((reply: PostInteraction) => (
+          <div key={reply.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-blue-600">
+                  💬 {reply.author || '匿名用戶'}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {new Date(reply.timestamp).toLocaleString('zh-TW', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              
+              {onRemoveReply && (
+                <button
+                  onClick={() => onRemoveReply(reply.id)}
+                  className="text-gray-400 hover:text-red-500 text-sm transition-colors"
+                  title="刪除回覆"
+                >
+                  ✕
+                </button>
+              )}
             </div>
             
-            {interaction.selectedText && (
-              <div className="mb-2 p-2 bg-gray-50 rounded text-sm">
-                <strong>選中文字：</strong> {interaction.selectedText}
-              </div>
-            )}
-            
-            <div className="text-sm">
-              {interaction.content}
+            <div className="text-sm leading-relaxed text-gray-800">
+              {reply.content}
             </div>
           </div>
         ))}

@@ -33,60 +33,12 @@ export function StructuredMarkdownRenderer({
     interactions,
     contentRef,
     onCommentClick: (interaction) => {
-      // 對於評論，我們希望 popover 出現在相關的文字標記附近，而不是評論圖標
-      // 先嘗試找到對應的 highlight 元素
-      const highlights = document.querySelectorAll(`[data-interaction-id="${interaction.id}"].text-highlight`)
-      
-      if (highlights.length > 0) {
-        // 找到最上方的 highlight 元素作為 target
-        let topMostElement = highlights[0] as HTMLElement
-        let minTop = topMostElement.getBoundingClientRect().top
-        
-        for (let i = 1; i < highlights.length; i++) {
-          const element = highlights[i] as HTMLElement
-          const rect = element.getBoundingClientRect()
-          if (rect.top < minTop) {
-            minTop = rect.top
-            topMostElement = element
-          }
-        }
-        
-        onCommentTarget(topMostElement, interaction)
-        return
-      }
-      
-      // 如果沒有找到 highlight，回退到使用評論圖標
-      const icon = document.querySelector(`.comment-icon[data-interaction-id="${interaction.id}"]`)
-      if (icon) {
-        onCommentTarget(icon as HTMLElement, interaction)
-      }
+      // 直接使用 interaction，不需要複雜的元素查找
+      onCommentTarget(null as any, interaction) // 傳 null 因為新 API 不需要 element
     },
     onHighlightClick: (interaction) => {
-      // 找到所有匹配的 highlight 元素
-      const highlights = document.querySelectorAll(`[data-interaction-id="${interaction.id}"].text-highlight`)
-      
-      if (highlights.length === 0) return
-      
-      // 如果只有一個元素，直接使用
-      if (highlights.length === 1) {
-        onHighlightTarget(highlights[0] as HTMLElement, interaction)
-        return
-      }
-      
-      // 如果有多個元素，找到最上方的那個
-      let topMostElement = highlights[0] as HTMLElement
-      let minTop = topMostElement.getBoundingClientRect().top
-      
-      for (let i = 1; i < highlights.length; i++) {
-        const element = highlights[i] as HTMLElement
-        const rect = element.getBoundingClientRect()
-        if (rect.top < minTop) {
-          minTop = rect.top
-          topMostElement = element
-        }
-      }
-      
-      onHighlightTarget(topMostElement, interaction)
+      // 直接使用 interaction，不需要複雜的元素查找
+      onHighlightTarget(null as any, interaction) // 傳 null 因為新 API 不需要 element
     }
   })
 

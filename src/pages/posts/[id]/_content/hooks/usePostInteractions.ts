@@ -4,9 +4,19 @@ import { PostController } from '../../../../../controllers/PostController'
 
 export interface UsePostInteractionsReturn {
     interactions: PostInteraction[]
+
+    // 標記相關
     addMark: (postId: string, text: string, position: TextPosition) => void
+
+    // 評論相關
     addComment: (postId: string, text: string, comment: string, position: TextPosition) => void
+
+    // 回覆相關
+    replies: PostInteraction[]
     addReply: (postId: string, content: string) => void
+    removeReply: (replyId: string) => void
+
+    // 通用
     removeInteraction: (interactionId: string) => void
 }
 
@@ -23,6 +33,9 @@ export function usePostInteractions(post: Post | undefined): UsePostInteractions
         postController.loadInteractions()
         setInteractions(postController.getInteractions(post.id))
     }, [post?.id, postController])
+
+    // 計算回覆列表
+    const replies = interactions.filter(i => i.type === 'reply')
 
     /**
      * 添加標記
@@ -49,7 +62,17 @@ export function usePostInteractions(post: Post | undefined): UsePostInteractions
     }
 
     /**
-     * 刪除互動記錄
+     * 刪除回覆 (專門的方法)
+     */
+    const removeReply = (replyId: string) => {
+        if (!post) return
+
+        postController.removeInteraction(replyId)
+        setInteractions(postController.getInteractions(post.id))
+    }
+
+    /**
+     * 刪除互動記錄 (通用方法)
      */
     const removeInteraction = (interactionId: string) => {
         if (!post) return
@@ -60,9 +83,11 @@ export function usePostInteractions(post: Post | undefined): UsePostInteractions
 
     return {
         interactions,
+        replies,
         addMark,
         addComment,
         addReply,
+        removeReply,
         removeInteraction
     }
 } 

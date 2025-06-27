@@ -1,15 +1,14 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { usePost } from '../../../contexts/PostContext'
-import type { TextPosition } from '../../../types/post'
+import type { TextPosition, PostInteraction } from '../../../types/post'
 import { StructuredMarkdownRenderer } from './_content/components/markdownRender/StructuredMarkdownRenderer'
 import { usePostInteractions } from './_content/hooks/usePostInteractions'
 import { useInteractionDialogs } from './_content/hooks/useInteractionDialogs'
-import { InteractionsList } from './_content/components/markdownRender/InteractionsList'
+import { ReplyList } from './_content/components/markdownRender/InteractionsList'
 import { InteractionDialogs } from './_content/components/markdownRender/InteractionDialogs'
 import { CommentPopover } from './_content/components/markdownRender/CommentPopover'
 import { HighlightPopover } from './_content/components/markdownRender/HighlightPopover'
-import { PopoverProvider } from './_content/contexts/PopoverContext'
 import { usePopover } from './_content/hooks/usePopover'
 import { TextSelectionProvider } from './_content/contexts/TextSelectionContext'
 import { useTextSelection } from './_content/hooks/useTextSelection'
@@ -29,9 +28,11 @@ function PostDetailContent() {
   // 互動功能邏輯
   const {
     interactions,
+    replies,
     addMark,
     addComment,
     addReply,
+    removeReply,
     removeInteraction
   } = usePostInteractions(post)
 
@@ -51,13 +52,12 @@ function PostDetailContent() {
     closeReplyDialog
   } = useInteractionDialogs()
 
-  // 統一的 popover 管理（只處理 comment 和 highlight）
+  // 統一的 popover 管理
   const {
     commentState,
     highlightState,
-    getPopoverPosition,
-    setCommentTarget,
-    setHighlightTarget,
+    showCommentPopover,
+    showHighlightPopover,
     closePopover
   } = usePopover()
   
@@ -95,9 +95,16 @@ function PostDetailContent() {
 
   // 提交回覆
   const handleReplySubmit = () => {
-    if (replyText.trim() && post) {
-      addReply(post.id, replyText)
-      closeReplyDialog()
+    if (!replyText.trim() || !post) return
+    
+    addReply(post.id, replyText)
+    closeReplyDialog()
+  }
+
+  // 刪除回覆
+  const handleRemoveReply = (replyId: string) => {
+    if (window.confirm('確定要刪除這則回覆嗎？')) {
+      removeReply(replyId)
     }
   }
   
@@ -136,6 +143,15 @@ function PostDetailContent() {
 
   // 獲取推薦文章 (複雜業務邏輯)
   const recommendedPosts = posts.length > 0 ? getRecommendedPosts(post, 3) : []
+
+  // 處理 popover 目標設置
+  const handleCommentTarget = (_element: HTMLElement | null, interaction: PostInteraction) => {
+    showCommentPopover(interaction)
+  }
+
+  const handleHighlightTarget = (_element: HTMLElement | null, interaction: PostInteraction) => {
+    showHighlightPopover(interaction)
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
@@ -180,12 +196,16 @@ function PostDetailContent() {
           <StructuredMarkdownRenderer 
             post={post} 
             interactions={interactions}
-            onCommentTarget={setCommentTarget}
-            onHighlightTarget={setHighlightTarget}
+            onCommentTarget={handleCommentTarget}
+            onHighlightTarget={handleHighlightTarget}
             onMark={handleMark}
             onComment={handleComment}
           />
       </article>
+
+
+      {/* 互動記錄 */}
+      {post && <ReplyList interactions={replies} postId={post.id} onRemoveReply={handleRemoveReply} />}
 
       {/* 回覆按鈕 */}
       <div className="mt-6 pt-4 border-t border-gray-200">
@@ -197,8 +217,9 @@ function PostDetailContent() {
         </button>
       </div>
 
-      {/* 互動記錄 */}
-      {post && <InteractionsList interactions={interactions} postId={post.id} />}
+      {/* 回覆留言 */}
+      
+
 
       {/* 推薦文章 */}
       {recommendedPosts.length > 0 && (
@@ -263,14 +284,14 @@ function PostDetailContent() {
 
       <CommentPopover
         interaction={commentState.data?.interaction || null}
-        position={getPopoverPosition()}
+        position={commentState.data?.position || null}
         show={commentState.isActive}
         onClose={closePopover}
       />
 
       <HighlightPopover
         interaction={highlightState.data?.interaction || null}
-        position={getPopoverPosition()}
+        position={highlightState.data?.position || null}
         show={highlightState.isActive}
         onClose={closePopover}
         onRemove={removeInteraction}
@@ -282,9 +303,7 @@ function PostDetailContent() {
 export default function PostDetail() {
   return (
     <TextSelectionProvider>
-      <PopoverProvider>
-        <PostDetailContent />
-      </PopoverProvider>
+      <PostDetailContent />
     </TextSelectionProvider>
   )
 } 
