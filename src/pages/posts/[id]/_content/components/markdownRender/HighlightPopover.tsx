@@ -1,33 +1,16 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type { PostInteraction } from '../../../../../../types/post'
 
 interface HighlightPopoverProps {
   interaction: PostInteraction | null
+  position: { top: number; left: number } | null
+  show: boolean
   onClose: () => void
   onRemove: (interactionId: string) => void
 }
 
-export function HighlightPopover({ interaction, onClose, onRemove }: HighlightPopoverProps) {
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+export function HighlightPopover({ interaction, position, show, onClose, onRemove }: HighlightPopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!interaction) return
-
-    // 找到對應的 highlight 元素
-    const highlight = document.querySelector(`[data-interaction-id="${interaction.id}"].text-highlight`)
-    if (highlight) {
-      const rect = highlight.getBoundingClientRect()
-      // 找到內容容器作為定位參考
-      const contentContainer = highlight.closest('.prose')?.parentElement || document.body
-      const containerRect = contentContainer.getBoundingClientRect()
-      
-      setPosition({
-        top: rect.top - containerRect.top - 45, // 在 highlight 上方
-        left: Math.max(10, rect.left - containerRect.left + (rect.width / 2) - 60) // 居中對齊，確保不超出邊界
-      })
-    }
-  }, [interaction])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -46,7 +29,7 @@ export function HighlightPopover({ interaction, onClose, onRemove }: HighlightPo
       }
     }
 
-    if (interaction) {
+    if (show) {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('keydown', handleEscape)
     }
@@ -55,7 +38,7 @@ export function HighlightPopover({ interaction, onClose, onRemove }: HighlightPo
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [interaction, onClose])
+  }, [show, onClose])
 
   const handleRemove = () => {
     if (interaction) {
@@ -64,7 +47,7 @@ export function HighlightPopover({ interaction, onClose, onRemove }: HighlightPo
     }
   }
 
-  if (!interaction || !position) return null
+  if (!show || !interaction || !position) return null
 
   return (
     <div

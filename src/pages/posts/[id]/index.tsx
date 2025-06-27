@@ -1,5 +1,5 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { usePost } from '../../../contexts/PostContext'
 import { StructuredMarkdownRenderer } from './_content/components/markdownRender/StructuredMarkdownRenderer'
 import { usePostInteractions } from './_content/hooks/usePostInteractions'
@@ -8,9 +8,11 @@ import { InteractionsList } from './_content/components/markdownRender/Interacti
 import { InteractionDialogs } from './_content/components/markdownRender/InteractionDialogs'
 import { CommentPopover } from './_content/components/markdownRender/CommentPopover'
 import { HighlightPopover } from './_content/components/markdownRender/HighlightPopover'
-import type { PostInteraction } from '../../../types/post'
+import { InteractionMenu } from './_content/components/markdownRender/InteractionMenu'
+import { PopoverProvider } from './_content/contexts/PopoverContext'
+import { usePopover } from './_content/hooks/usePopover'
 
-export default function PostDetail() {
+function PostDetailContent() {
   const { id } = useParams<{ id: string }>()
   const { 
     usePostQuery, 
@@ -18,10 +20,6 @@ export default function PostDetail() {
     getRecommendedPosts, 
     posts 
   } = usePost()
-  
-  // Comment 和 Highlight 彈出框狀態
-  const [selectedComment, setSelectedComment] = useState<PostInteraction | null>(null)
-  const [selectedHighlight, setSelectedHighlight] = useState<PostInteraction | null>(null)
   
   // 使用 TanStack Query 獲取文章數據
   const { post, isLoading, error } = usePostQuery(id || '')
@@ -42,19 +40,69 @@ export default function PostDetail() {
     setCommentText,
     openCommentDialog,
     closeCommentDialog,
+    selectedTextForComment,
+    selectedPositionForComment,
     showReplyDialog,
     replyText,
     setReplyText,
     openReplyDialog,
     closeReplyDialog
   } = useInteractionDialogs()
+
+  // 統一的 popover 管理
+  const {
+    menuState,
+    commentState,
+    highlightState,
+    getPopoverPosition,
+    setMenuTarget,
+    setCommentTarget,
+    setHighlightTarget,
+    closePopover
+  } = usePopover()
   
   useEffect(() => {
     if (post) {
-      setCurrentPost(post) // 設置當前文章到 Controller
+      setCurrentPost(post)
     }
   }, [post, setCurrentPost])
   
+  // 通用的選中文字處理函數
+  const handleWithSelectedText = (callback: (selectedText: string, selectedPosition: any) => void) => {
+    if (!post) return
+    
+    const selectedText = menuState.data?.selectedText
+    const selectedPosition = menuState.data?.position
+    if (selectedText && selectedPosition) {
+      callback(selectedText, selectedPosition)
+      closePopover()
+    }
+  }
+
+  // 處理標記
+  const handleMark = () => {
+    handleWithSelectedText((selectedText, selectedPosition) => {
+      addMark(post!.id, selectedText, selectedPosition)
+    })
+  }
+
+  // 處理評論
+  const handleComment = () => {
+    const selectedText = menuState.data?.selectedText
+    const selectedPosition = menuState.data?.position
+    if (selectedText && selectedPosition) {
+      openCommentDialog(selectedText, selectedPosition)
+    }
+  }
+
+  // 提交評論
+  const handleCommentSubmit = () => {
+    if (!commentText.trim() || !selectedTextForComment || !selectedPositionForComment || !post) return
+    
+    addComment(post.id, selectedTextForComment, commentText, selectedPositionForComment)
+    closeCommentDialog()
+  }
+
   // 提交回覆
   const handleReplySubmit = () => {
     if (replyText.trim() && post) {
@@ -100,7 +148,7 @@ export default function PostDetail() {
   const recommendedPosts = posts.length > 0 ? getRecommendedPosts(post, 3) : []
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 relative">
       {/* 返回按鈕 */}
       <div className="mb-6">
         <Link 
@@ -138,24 +186,13 @@ export default function PostDetail() {
       </header>
 
       {/* 文章內容 - 使用結構化渲染器 */}
-      <article>
+      <article className="relative">
           <StructuredMarkdownRenderer 
             post={post} 
             interactions={interactions}
-            onCommentClick={setSelectedComment}
-            onHighlightClick={setSelectedHighlight}
-            onMark={addMark}
-            onComment={openCommentDialog}
-            commentText={commentText}
-            onCommentTextChange={setCommentText}
-            onCommentSubmit={(selectedText, position) => {
-              if (commentText.trim() && post) {
-                addComment(post.id, selectedText, commentText, position)
-                closeCommentDialog()
-              }
-            }}
-            onCommentCancel={closeCommentDialog}
-            showCommentDialog={showCommentDialog}
+            onMenuTarget={setMenuTarget}
+            onCommentTarget={setCommentTarget}
+            onHighlightTarget={setHighlightTarget}
           />
       </article>
 
@@ -220,12 +257,12 @@ export default function PostDetail() {
 
       {/* 對話框 */}
       <InteractionDialogs
-        showCommentDialog={false} // 評論對話框由 StructuredMarkdownRenderer 處理
-        commentText=""
-        selectedText=""
-        onCommentTextChange={() => {}}
-        onCommentSubmit={() => {}}
-        onCommentCancel={() => {}}
+        showCommentDialog={showCommentDialog}
+        commentText={commentText}
+        selectedText={selectedTextForComment || ''}
+        onCommentTextChange={setCommentText}
+        onCommentSubmit={handleCommentSubmit}
+        onCommentCancel={closeCommentDialog}
         showReplyDialog={showReplyDialog}
         replyText={replyText}
         onReplyTextChange={setReplyText}
@@ -233,18 +270,37 @@ export default function PostDetail() {
         onReplyCancel={closeReplyDialog}
       />
 
-      {/* Comment 彈出框 */}
-      <CommentPopover
-        interaction={selectedComment}
-        onClose={() => setSelectedComment(null)}
+      {/* 統一的 Popover 管理 */}
+      <InteractionMenu
+        show={menuState.isActive}
+        position={menuState.data?.menuPosition || null}
+        onMark={handleMark}
+        onComment={handleComment}
+        onClose={closePopover}
       />
 
-      {/* Highlight 彈出框 */}
+      <CommentPopover
+        interaction={commentState.data?.interaction || null}
+        position={getPopoverPosition()}
+        show={commentState.isActive}
+        onClose={closePopover}
+      />
+
       <HighlightPopover
-        interaction={selectedHighlight}
-        onClose={() => setSelectedHighlight(null)}
+        interaction={highlightState.data?.interaction || null}
+        position={getPopoverPosition()}
+        show={highlightState.isActive}
+        onClose={closePopover}
         onRemove={removeInteraction}
       />
     </div>
+  )
+}
+
+export default function PostDetail() {
+  return (
+    <PopoverProvider>
+      <PostDetailContent />
+    </PopoverProvider>
   )
 } 

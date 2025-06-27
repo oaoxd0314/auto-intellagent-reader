@@ -1,19 +1,49 @@
-import { cn } from '../../../../../../lib/utils'
+import { useEffect, useRef } from 'react'
+import { cn } from '@/lib/utils'
 
 export interface InteractionMenuProps {
   show: boolean
   position: { left: number; top: number } | null
   onMark: () => void
   onComment: () => void
+  onClose: () => void
 }
 
-export function InteractionMenu({ show, position, onMark, onComment }: InteractionMenuProps) {
+export function InteractionMenu({ show, position, onMark, onComment, onClose }: InteractionMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // 點擊外部關閉
+  useEffect(() => {
+    if (!show) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [show, onClose])
+
   if (!show || !position) return null
 
   const menuWidth = 180 // 預估選單寬度
 
   return (
     <div
+      ref={menuRef}
       className={cn(
         "absolute z-50 w-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg interaction-menu",
         "animate-in fade-in-0 zoom-in-95 duration-200"

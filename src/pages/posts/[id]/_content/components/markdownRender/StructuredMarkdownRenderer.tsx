@@ -2,22 +2,13 @@ import { useEffect } from 'react'
 import type { Post, PostInteraction, TextPosition } from '../../../../../../types/post'
 import { useTextSelection } from '../../hooks/useTextSelection'
 import { useTextMarking } from '../../hooks/useTextMarking'
-import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
-import { InteractionMenu } from './InteractionMenu'
-import { InteractionDialogs } from './InteractionDialogs'
 
 interface StructuredMarkdownRendererProps {
   post: Post
-  onCommentClick: (interaction: PostInteraction) => void
-  onHighlightClick: (interaction: PostInteraction) => void
-  onMark: (postId: string, text: string, position: TextPosition) => void
-  onComment: () => void
-  commentText: string
-  onCommentTextChange: (text: string) => void
-  onCommentSubmit: (selectedText: string, position: TextPosition) => void
-  onCommentCancel: () => void
-  showCommentDialog: boolean
   interactions: PostInteraction[]
+  onMenuTarget: (element: HTMLElement, selectedText: string, position: TextPosition) => void
+  onCommentTarget: (element: HTMLElement, interaction: PostInteraction) => void
+  onHighlightTarget: (element: HTMLElement, interaction: PostInteraction) => void
 }
 
 /**
@@ -26,16 +17,10 @@ interface StructuredMarkdownRendererProps {
  */
 export function StructuredMarkdownRenderer({ 
   post, 
-  onCommentClick,
-  onHighlightClick,
-  onMark,
-  onComment,
-  commentText,
-  onCommentTextChange,
-  onCommentSubmit,
-  onCommentCancel,
-  showCommentDialog,
-  interactions
+  interactions,
+  onMenuTarget,
+  onCommentTarget,
+  onHighlightTarget
 }: StructuredMarkdownRendererProps) {
   // 文字選擇邏輯
   const {
@@ -51,39 +36,39 @@ export function StructuredMarkdownRenderer({
   useTextMarking({
     interactions,
     contentRef,
-    onCommentClick,
-    onHighlightClick
+    onCommentClick: (interaction) => {
+      const icon = document.querySelector(`.comment-icon[data-interaction-id="${interaction.id}"]`)
+      if (icon) {
+        onCommentTarget(icon as HTMLElement, interaction)
+      }
+    },
+    onHighlightClick: (interaction) => {
+      const highlight = document.querySelector(`[data-interaction-id="${interaction.id}"].text-highlight`)
+      if (highlight) {
+        onHighlightTarget(highlight as HTMLElement, interaction)
+      }
+    }
   })
 
-  // 處理標記
-  const handleMark = () => {
-    if (selectedText && selectionPosition) {
-      onMark(post.id, selectedText, selectionPosition)
-      clearSelection()
+  // 處理文字選擇顯示選單
+  useEffect(() => {
+    if (showInteractionMenu && menuPosition && selectedText && selectionPosition) {
+      // 創建一個虛擬元素來表示選擇位置
+      const virtualElement = {
+        getBoundingClientRect: () => ({
+          left: menuPosition.left,
+          top: menuPosition.top,
+          right: menuPosition.left,
+          bottom: menuPosition.top,
+          width: 0,
+          height: 0
+        })
+      }
+      onMenuTarget(virtualElement as HTMLElement, selectedText, selectionPosition)
     }
-  }
+  }, [showInteractionMenu, menuPosition, selectedText, selectionPosition, onMenuTarget])
 
-  // 處理評論
-  const handleComment = () => {
-    onComment()
-  }
-
-  // 提交評論
-  const handleCommentSubmit = () => {
-    if (selectedText && selectionPosition && commentText.trim()) {
-      onCommentSubmit(selectedText, selectionPosition)
-      clearSelection()
-    }
-  }
-
-  // 快捷鍵支援
-  useKeyboardShortcuts({
-    selectedText,
-    showInteractionMenu,
-    onMark: handleMark,
-    onComment: handleComment,
-    onClear: clearSelection
-  })
+  // 處理標記和評論現在由 parent 組件處理
 
   // 為段落添加 ID
   useEffect(() => {
@@ -124,28 +109,7 @@ export function StructuredMarkdownRenderer({
         )}
       </div>
 
-      {/* 互動選單 */}
-      <InteractionMenu
-        show={showInteractionMenu}
-        position={menuPosition}
-        onMark={handleMark}
-        onComment={handleComment}
-      />
 
-      {/* 評論對話框 */}
-      <InteractionDialogs
-        showCommentDialog={showCommentDialog}
-        commentText={commentText}
-        selectedText={selectedText || ''}
-        onCommentTextChange={onCommentTextChange}
-        onCommentSubmit={handleCommentSubmit}
-        onCommentCancel={onCommentCancel}
-        showReplyDialog={false}
-        replyText=""
-        onReplyTextChange={() => {}}
-        onReplySubmit={() => {}}
-        onReplyCancel={() => {}}
-      />
     </div>
   )
 } 
