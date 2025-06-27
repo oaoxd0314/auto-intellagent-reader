@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { usePost } from '../../contexts/PostContext'
+import InteractionStats from '../../components/InteractionStats'
 
 export default function PostsIndex() {
   const { 
@@ -38,7 +39,9 @@ export default function PostsIndex() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">所有文章</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <h1 className="text-3xl font-bold">所有文章</h1>
+      </div>
       
       {/* 搜索和篩選 */}
       <div className="mb-8 space-y-4">
@@ -101,6 +104,11 @@ export default function PostsIndex() {
             <div className="text-gray-600 text-sm mb-3">
               <div>發布日期: {post.date}</div>
               {post.author && <div>作者: {post.author}</div>}
+            </div>
+            
+            {/* 互動統計 */}
+            <div className="mb-3">
+              <InteractionStats postId={post.id} size="sm" />
             </div>
             
             {post.tags && post.tags.length > 0 && (

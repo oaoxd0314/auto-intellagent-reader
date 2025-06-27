@@ -205,7 +205,7 @@ function PostDetailContent() {
 
 
       {/* 互動記錄 */}
-      {post && <ReplyList interactions={replies} postId={post.id} onRemoveReply={handleRemoveReply} />}
+      {post && <ReplyList interactions={replies} onRemoveReply={handleRemoveReply} />}
 
       {/* 回覆按鈕 */}
       <div className="mt-6 pt-4 border-t border-gray-200">

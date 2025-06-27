@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react'
 import type { Post, PostInteraction } from '../../../../../../types/post'
-import { useTextSelectionContext } from '../../contexts/TextSelectionContext'
 import { useTextMarking } from '../../hooks/useTextMarking'
 import { InteractionMenu } from './InteractionMenu'
 
@@ -26,7 +25,6 @@ export function StructuredMarkdownRenderer({
   onComment
 }: StructuredMarkdownRendererProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const selectionContext = useTextSelectionContext()
 
   // 文字標記邏輯
   useTextMarking({
