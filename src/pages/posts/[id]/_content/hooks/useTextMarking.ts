@@ -121,13 +121,40 @@ export function useTextMarking({ interactions, contentRef, onCommentClick, onHig
         for (const textNode of textNodes) {
             const text = textNode.textContent || ''
             const selectedText = interaction.selectedText
-            const index = text.indexOf(selectedText)
+            const normalizedText = text.replace(/\s+/g, ' ')
+            const normalizedSelected = selectedText.replace(/\s+/g, ' ')
+
+            // 先嘗試精確匹配
+            let index = text.indexOf(selectedText)
+
+            // 如果精確匹配失敗，嘗試標準化匹配
+            if (index === -1) {
+                index = normalizedText.indexOf(normalizedSelected)
+                if (index !== -1) {
+                    // 找到標準化位置後，需要映射回原始文字位置
+                    let originalIndex = 0
+                    let normalizedIndex = 0
+                    while (normalizedIndex < index && originalIndex < text.length) {
+                        if (/\s/.test(text[originalIndex])) {
+                            // 跳過連續空白，但在標準化中只計算一個空格
+                            while (originalIndex < text.length && /\s/.test(text[originalIndex])) {
+                                originalIndex++
+                            }
+                            normalizedIndex++
+                        } else {
+                            originalIndex++
+                            normalizedIndex++
+                        }
+                    }
+                    index = originalIndex
+                }
+            }
 
             if (index !== -1) {
                 try {
                     const range = document.createRange()
                     range.setStart(textNode, index)
-                    range.setEnd(textNode, index + selectedText.length)
+                    range.setEnd(textNode, Math.min(index + selectedText.length, text.length))
                     applyMarkToRange(range, interaction)
                     break // 只標記第一個匹配
                 } catch (error) {
@@ -204,14 +231,22 @@ export function useTextMarking({ interactions, contentRef, onCommentClick, onHig
             const rangeText = range.toString()
 
             // 驗證文字是否匹配（允許一些空白字元的差異）
-            if (rangeText.trim() !== selectedText.trim()) {
-                console.warn('Text mismatch, falling back to content matching:', {
-                    expected: selectedText,
-                    actual: rangeText,
-                    sectionId: interaction.position.sectionId
-                })
-                markTextByContent(element, interaction)
-                return
+            const normalizedRange = rangeText.replace(/\s+/g, ' ').trim()
+            const normalizedSelected = selectedText.replace(/\s+/g, ' ').trim()
+
+            if (normalizedRange !== normalizedSelected) {
+                // 如果完全不匹配，嘗試部分匹配
+                if (!normalizedRange.includes(normalizedSelected) && !normalizedSelected.includes(normalizedRange)) {
+                    console.warn('Text mismatch, falling back to content matching:', {
+                        expected: selectedText,
+                        actual: rangeText,
+                        sectionId: interaction.position.sectionId,
+                        normalizedExpected: normalizedSelected,
+                        normalizedActual: normalizedRange
+                    })
+                    markTextByContent(element, interaction)
+                    return
+                }
             }
 
             // 應用標記

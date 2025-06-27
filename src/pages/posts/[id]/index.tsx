@@ -1,6 +1,7 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { usePost } from '../../../contexts/PostContext'
+import type { TextPosition } from '../../../types/post'
 import { StructuredMarkdownRenderer } from './_content/components/markdownRender/StructuredMarkdownRenderer'
 import { usePostInteractions } from './_content/hooks/usePostInteractions'
 import { useInteractionDialogs } from './_content/hooks/useInteractionDialogs'
@@ -8,9 +9,10 @@ import { InteractionsList } from './_content/components/markdownRender/Interacti
 import { InteractionDialogs } from './_content/components/markdownRender/InteractionDialogs'
 import { CommentPopover } from './_content/components/markdownRender/CommentPopover'
 import { HighlightPopover } from './_content/components/markdownRender/HighlightPopover'
-import { InteractionMenu } from './_content/components/markdownRender/InteractionMenu'
 import { PopoverProvider } from './_content/contexts/PopoverContext'
 import { usePopover } from './_content/hooks/usePopover'
+import { TextSelectionProvider } from './_content/contexts/TextSelectionContext'
+import { useTextSelection } from './_content/hooks/useTextSelection'
 
 function PostDetailContent() {
   const { id } = useParams<{ id: string }>()
@@ -49,13 +51,11 @@ function PostDetailContent() {
     closeReplyDialog
   } = useInteractionDialogs()
 
-  // 統一的 popover 管理
+  // 統一的 popover 管理（只處理 comment 和 highlight）
   const {
-    menuState,
     commentState,
     highlightState,
     getPopoverPosition,
-    setMenuTarget,
     setCommentTarget,
     setHighlightTarget,
     closePopover
@@ -67,33 +67,23 @@ function PostDetailContent() {
     }
   }, [post, setCurrentPost])
   
-  // 通用的選中文字處理函數
-  const handleWithSelectedText = (callback: (selectedText: string, selectedPosition: any) => void) => {
-    if (!post) return
-    
-    const selectedText = menuState.data?.selectedText
-    const selectedPosition = menuState.data?.position
-    if (selectedText && selectedPosition) {
-      callback(selectedText, selectedPosition)
-      closePopover()
-    }
-  }
-
   // 處理標記
-  const handleMark = () => {
-    handleWithSelectedText((selectedText, selectedPosition) => {
-      addMark(post!.id, selectedText, selectedPosition)
-    })
+  const handleMarkAction = (selectedText: string, selectedPosition: TextPosition) => {
+    if (!post) return
+    addMark(post.id, selectedText, selectedPosition)
   }
 
   // 處理評論
-  const handleComment = () => {
-    const selectedText = menuState.data?.selectedText
-    const selectedPosition = menuState.data?.position
-    if (selectedText && selectedPosition) {
-      openCommentDialog(selectedText, selectedPosition)
-    }
+  const handleCommentAction = (selectedText: string, selectedPosition: TextPosition) => {
+    if (!post) return
+    openCommentDialog(selectedText, selectedPosition)
   }
+
+  // 文字選擇管理
+  const { contentRef, handleMark, handleComment } = useTextSelection({
+    onMark: handleMarkAction,
+    onComment: handleCommentAction
+  })
 
   // 提交評論
   const handleCommentSubmit = () => {
@@ -186,13 +176,14 @@ function PostDetailContent() {
       </header>
 
       {/* 文章內容 - 使用結構化渲染器 */}
-      <article className="relative">
+      <article className="relative" ref={contentRef}>
           <StructuredMarkdownRenderer 
             post={post} 
             interactions={interactions}
-            onMenuTarget={setMenuTarget}
             onCommentTarget={setCommentTarget}
             onHighlightTarget={setHighlightTarget}
+            onMark={handleMark}
+            onComment={handleComment}
           />
       </article>
 
@@ -270,15 +261,6 @@ function PostDetailContent() {
         onReplyCancel={closeReplyDialog}
       />
 
-      {/* 統一的 Popover 管理 */}
-      <InteractionMenu
-        show={menuState.isActive}
-        position={menuState.data?.menuPosition || null}
-        onMark={handleMark}
-        onComment={handleComment}
-        onClose={closePopover}
-      />
-
       <CommentPopover
         interaction={commentState.data?.interaction || null}
         position={getPopoverPosition()}
@@ -299,8 +281,10 @@ function PostDetailContent() {
 
 export default function PostDetail() {
   return (
-    <PopoverProvider>
-      <PostDetailContent />
-    </PopoverProvider>
+    <TextSelectionProvider>
+      <PopoverProvider>
+        <PostDetailContent />
+      </PopoverProvider>
+    </TextSelectionProvider>
   )
 } 

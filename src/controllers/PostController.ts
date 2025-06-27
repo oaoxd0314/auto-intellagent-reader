@@ -389,6 +389,24 @@ export class PostController extends AbstractController<PostControllerState> {
             const saved = localStorage.getItem('post-interactions')
             if (saved) {
                 const interactions = JSON.parse(saved) as PostInteraction[]
+
+                // 開發模式下，清理可能過時的互動記錄
+                if (process.env.NODE_ENV === 'development') {
+                    const now = Date.now()
+                    const filteredInteractions = interactions.filter(interaction => {
+                        const interactionTime = new Date(interaction.timestamp).getTime()
+                        // 只保留最近 1 小時內的互動記錄，避免 hot reload 導致的位置錯亂
+                        return now - interactionTime < 60 * 60 * 1000
+                    })
+
+                    if (filteredInteractions.length !== interactions.length) {
+                        this.setState({ interactions: filteredInteractions })
+                        this.saveInteractions()
+                        this.log('Cleaned up outdated interactions in dev mode')
+                        return
+                    }
+                }
+
                 this.setState({ interactions })
                 this.emit('interactionsLoaded', interactions)
             }
@@ -428,6 +446,19 @@ export class PostController extends AbstractController<PostControllerState> {
         }
 
         return stats
+    }
+
+    /**
+     * 清理所有 localStorage 中的互動記錄（開發用）
+     */
+    clearAllStoredInteractions(): void {
+        try {
+            localStorage.removeItem('post-interactions')
+            this.setState({ interactions: [] })
+            this.log('Cleared all stored interactions')
+        } catch (error) {
+            this.log('Failed to clear stored interactions', error)
+        }
     }
 
     /**

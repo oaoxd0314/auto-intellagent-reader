@@ -1,74 +1,94 @@
-import { useEffect } from 'react'
-import type { Post, PostInteraction, TextPosition } from '../../../../../../types/post'
-import { useTextSelection } from '../../hooks/useTextSelection'
+import { useEffect, useRef } from 'react'
+import type { Post, PostInteraction } from '../../../../../../types/post'
+import { useTextSelectionContext } from '../../contexts/TextSelectionContext'
 import { useTextMarking } from '../../hooks/useTextMarking'
+import { InteractionMenu } from './InteractionMenu'
 
 interface StructuredMarkdownRendererProps {
   post: Post
   interactions: PostInteraction[]
-  onMenuTarget: (element: HTMLElement, selectedText: string, position: TextPosition) => void
   onCommentTarget: (element: HTMLElement, interaction: PostInteraction) => void
   onHighlightTarget: (element: HTMLElement, interaction: PostInteraction) => void
+  onMark: () => void
+  onComment: () => void
 }
 
 /**
  * 結構化 Markdown 渲染器 - 專注於渲染
- * 只負責 markdown 內容渲染和文字選擇交互
+ * 只負責 markdown 內容渲染和互動標記顯示
  */
 export function StructuredMarkdownRenderer({ 
   post, 
   interactions,
-  onMenuTarget,
   onCommentTarget,
-  onHighlightTarget
+  onHighlightTarget,
+  onMark,
+  onComment
 }: StructuredMarkdownRendererProps) {
-  // 文字選擇邏輯
-  const {
-    selectedText,
-    selectionPosition,
-    showInteractionMenu,
-    menuPosition,
-    contentRef,
-    clearSelection
-  } = useTextSelection()
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const selectionContext = useTextSelectionContext()
 
   // 文字標記邏輯
   useTextMarking({
     interactions,
     contentRef,
     onCommentClick: (interaction) => {
+      // 對於評論，我們希望 popover 出現在相關的文字標記附近，而不是評論圖標
+      // 先嘗試找到對應的 highlight 元素
+      const highlights = document.querySelectorAll(`[data-interaction-id="${interaction.id}"].text-highlight`)
+      
+      if (highlights.length > 0) {
+        // 找到最上方的 highlight 元素作為 target
+        let topMostElement = highlights[0] as HTMLElement
+        let minTop = topMostElement.getBoundingClientRect().top
+        
+        for (let i = 1; i < highlights.length; i++) {
+          const element = highlights[i] as HTMLElement
+          const rect = element.getBoundingClientRect()
+          if (rect.top < minTop) {
+            minTop = rect.top
+            topMostElement = element
+          }
+        }
+        
+        onCommentTarget(topMostElement, interaction)
+        return
+      }
+      
+      // 如果沒有找到 highlight，回退到使用評論圖標
       const icon = document.querySelector(`.comment-icon[data-interaction-id="${interaction.id}"]`)
       if (icon) {
         onCommentTarget(icon as HTMLElement, interaction)
       }
     },
     onHighlightClick: (interaction) => {
-      const highlight = document.querySelector(`[data-interaction-id="${interaction.id}"].text-highlight`)
-      if (highlight) {
-        onHighlightTarget(highlight as HTMLElement, interaction)
+      // 找到所有匹配的 highlight 元素
+      const highlights = document.querySelectorAll(`[data-interaction-id="${interaction.id}"].text-highlight`)
+      
+      if (highlights.length === 0) return
+      
+      // 如果只有一個元素，直接使用
+      if (highlights.length === 1) {
+        onHighlightTarget(highlights[0] as HTMLElement, interaction)
+        return
       }
+      
+      // 如果有多個元素，找到最上方的那個
+      let topMostElement = highlights[0] as HTMLElement
+      let minTop = topMostElement.getBoundingClientRect().top
+      
+      for (let i = 1; i < highlights.length; i++) {
+        const element = highlights[i] as HTMLElement
+        const rect = element.getBoundingClientRect()
+        if (rect.top < minTop) {
+          minTop = rect.top
+          topMostElement = element
+        }
+      }
+      
+      onHighlightTarget(topMostElement, interaction)
     }
   })
-
-  // 處理文字選擇顯示選單
-  useEffect(() => {
-    if (showInteractionMenu && menuPosition && selectedText && selectionPosition) {
-      // 創建一個虛擬元素來表示選擇位置
-      const virtualElement = {
-        getBoundingClientRect: () => ({
-          left: menuPosition.left,
-          top: menuPosition.top,
-          right: menuPosition.left,
-          bottom: menuPosition.top,
-          width: 0,
-          height: 0
-        })
-      }
-      onMenuTarget(virtualElement as HTMLElement, selectedText, selectionPosition)
-    }
-  }, [showInteractionMenu, menuPosition, selectedText, selectionPosition, onMenuTarget])
-
-  // 處理標記和評論現在由 parent 組件處理
 
   // 為段落添加 ID
   useEffect(() => {
@@ -109,7 +129,11 @@ export function StructuredMarkdownRenderer({
         )}
       </div>
 
-
+      {/* 互動選單 - 由 TextSelectionContext 管理 */}
+      <InteractionMenu
+        onMark={onMark}
+        onComment={onComment}
+      />
     </div>
   )
 } 

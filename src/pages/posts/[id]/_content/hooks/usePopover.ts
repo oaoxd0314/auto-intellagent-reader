@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { usePopoverContext, type PopoverTarget, type PopoverType } from '../contexts/PopoverContext'
+import { usePopoverContext, type PopoverType } from '../contexts/PopoverContext'
 import type { PostInteraction } from '../../../../../types/post'
 
 // Popover 配置
@@ -13,15 +13,7 @@ interface PopoverConfig {
     hasPosition: boolean // 是否需要位置信息
 }
 
-const targetSettings: Record<PopoverType, PopoverConfig> = {
-    menu: {
-        positioning: 'relative',
-        offset: { x: 0, y: 0 },
-        alignment: 'center',
-        hasInteraction: false,
-        hasSelectedText: true,
-        hasPosition: true
-    },
+const targetSettings: Record<Exclude<PopoverType, 'menu'>, PopoverConfig> = {
     comment: {
         positioning: 'relative',
         offset: { x: 0, y: 5 },
@@ -33,7 +25,7 @@ const targetSettings: Record<PopoverType, PopoverConfig> = {
     },
     highlight: {
         positioning: 'relative',
-        offset: { x: 0, y: -60 },
+        offset: { x: 0, y: 100 },
         alignment: 'center',
         containerSelector: 'article.relative',
         hasInteraction: true,
@@ -45,8 +37,27 @@ const targetSettings: Record<PopoverType, PopoverConfig> = {
 export function usePopover() {
     const { target, setTarget } = usePopoverContext()
 
-    // 通用的 popover 狀態檢查函數
-    const getPopoverState = useCallback((popoverType: PopoverType) => {
+    // 直接計算狀態，避免複雜的 useMemo 依賴
+    const commentState = {
+        isActive: target?.type === 'comment',
+        data: target?.type === 'comment' ? {
+            interaction: target?.interaction || null,
+            selectedText: null,
+            position: null
+        } : null
+    }
+
+    const highlightState = {
+        isActive: target?.type === 'highlight',
+        data: target?.type === 'highlight' ? {
+            interaction: target?.interaction || null,
+            selectedText: null,
+            position: null
+        } : null
+    }
+
+    // 通用的 popover 狀態檢查函數（排除 menu）
+    const getPopoverState = useCallback((popoverType: Exclude<PopoverType, 'menu'>) => {
         const isActive = target?.type === popoverType
         const config = targetSettings[popoverType]
 
@@ -55,22 +66,13 @@ export function usePopover() {
             data: isActive ? {
                 interaction: config.hasInteraction ? target?.interaction || null : null,
                 selectedText: config.hasSelectedText ? target?.selectedText || null : null,
-                position: config.hasPosition ? target?.position || null : null,
-                menuPosition: popoverType === 'menu' && target ? {
-                    left: target.rect.left,
-                    top: target.rect.bottom
-                } : null
+                position: config.hasPosition ? target?.position || null : null
             } : null
         }
     }, [target])
 
-    // 各種 popover 的狀態
-    const menuState = useMemo(() => getPopoverState('menu'), [getPopoverState])
-    const commentState = useMemo(() => getPopoverState('comment'), [getPopoverState])
-    const highlightState = useMemo(() => getPopoverState('highlight'), [getPopoverState])
-
-    // 通用位置計算函數
-    const calculatePosition = useCallback((popoverType: PopoverType) => {
+    // 通用位置計算函數（排除 menu）
+    const calculatePosition = useCallback((popoverType: Exclude<PopoverType, 'menu'>) => {
         const state = getPopoverState(popoverType)
         if (!state.isActive || !target) return null
 
@@ -113,22 +115,11 @@ export function usePopover() {
 
     // 獲取 popover 位置
     const getPopoverPosition = useCallback(() => {
-        if (!target) return null
-        return calculatePosition(target.type)
+        if (!target || target.type === 'menu') return null
+        return calculatePosition(target.type as Exclude<PopoverType, 'menu'>)
     }, [target, calculatePosition])
 
-    // 設置不同類型的 target
-    const setMenuTarget = useCallback((element: HTMLElement, selectedText: string, position: any) => {
-        const rect = element.getBoundingClientRect()
-        setTarget({
-            type: 'menu',
-            element,
-            rect,
-            selectedText,
-            position
-        })
-    }, [setTarget])
-
+    // 設置不同類型的 target（排除 menu）
     const setCommentTarget = useCallback((element: HTMLElement, interaction: PostInteraction) => {
         const rect = element.getBoundingClientRect()
         setTarget({
@@ -153,8 +144,7 @@ export function usePopover() {
     const closePopover = useCallback(() => setTarget(null), [setTarget])
 
     return {
-        // 狀態 API（配置驅動）
-        menuState,
+        // 狀態 API（配置驅動，排除 menu）
         commentState,
         highlightState,
         getPopoverState,
@@ -162,8 +152,7 @@ export function usePopover() {
         // 位置
         getPopoverPosition,
 
-        // 控制函數
-        setMenuTarget,
+        // 控制函數（排除 menu）
         setCommentTarget,
         setHighlightTarget,
         closePopover,

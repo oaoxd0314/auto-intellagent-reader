@@ -1,61 +1,48 @@
-import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { useTextSelectionContext } from '../../contexts/TextSelectionContext'
 
 export interface InteractionMenuProps {
-  show: boolean
-  position: { left: number; top: number } | null
+  show?: boolean
+  position?: { left: number; top: number } | null
   onMark: () => void
   onComment: () => void
-  onClose: () => void
 }
 
-export function InteractionMenu({ show, position, onMark, onComment, onClose }: InteractionMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  // 點擊外部關閉
-  useEffect(() => {
-    if (!show) return
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [show, onClose])
-
-  if (!show || !position) return null
+export function InteractionMenu({ show, position, onMark, onComment }: InteractionMenuProps) {
+  const selectionContext = useTextSelectionContext()
+  
+  // 優先使用 Context 中的狀態，fallback 到 props
+  const isVisible = show !== undefined ? show : selectionContext.isMenuVisible
+  const menuPosition = position !== undefined ? position : selectionContext.menuPosition
+  
+  if (!isVisible || !menuPosition) return null
 
   const menuWidth = 180 // 預估選單寬度
+  
+  const handleMark = () => {
+    onMark()
+    selectionContext.hideMenu()
+  }
+  
+  const handleComment = () => {
+    onComment()
+    selectionContext.hideMenu()
+  }
 
   return (
     <div
-      ref={menuRef}
       className={cn(
         "absolute z-50 w-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-lg interaction-menu",
         "animate-in fade-in-0 zoom-in-95 duration-200"
       )}
       style={{
-        left: position.left - menuWidth / 2,
-        top: position.top,
+        left: menuPosition.left - menuWidth / 2,
+        top: menuPosition.top,
       }}
     >
       <div className="flex items-center gap-1">
         <button
-          onClick={onMark}
+          onClick={handleMark}
           className={cn(
             "px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground rounded flex items-center gap-2",
             "transition-colors duration-150 whitespace-nowrap"
@@ -66,7 +53,7 @@ export function InteractionMenu({ show, position, onMark, onComment, onClose }: 
           <kbd className="ml-1 text-xs opacity-60 bg-gray-100 px-1 rounded">⌘⇧H</kbd>
         </button>
         <button
-          onClick={onComment}
+          onClick={handleComment}
           className={cn(
             "px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground rounded flex items-center gap-2",
             "transition-colors duration-150 whitespace-nowrap"
