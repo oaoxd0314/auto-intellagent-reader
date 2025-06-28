@@ -1,6 +1,8 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { usePostDetail } from '../../../hooks/usePostPage'
 import { StructuredMarkdownRenderer } from '../../../components/MarkdownRender'
+import { PostReplySection } from '../../../components/PostReplySection'
+import { useInteraction } from '../../../contexts/InteractionContext'
 
 
 function PostDetailContent() {
@@ -19,6 +21,10 @@ function PostDetailContent() {
     // 操作方法
     clearError,
   } = usePostDetail(id || '')
+
+  // 獲取互動統計
+  const { getInteractionStats } = useInteraction()
+  const interactionStats = post ? getInteractionStats(post.id) : { total: 0, replies: 0, comments: 0, highlights: 0 }
   
   if (!id) {
     return <Navigate to="/posts" replace />
@@ -84,7 +90,8 @@ function PostDetailContent() {
         <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
           <div>發布日期: {post.date}</div>
           {post.author && <div>作者: {post.author}</div>}
-          <div>互動數: 0</div>
+          <div>互動數: {interactionStats.total}</div>
+          {interactionStats.replies > 0 && <div>回覆: {interactionStats.replies}</div>}
         </div>
         
         {/* 標籤 */}
@@ -113,18 +120,8 @@ function PostDetailContent() {
       </div>
 
       {/* 回覆區域 */}
-      <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">討論區</h3>
-          <button
-            // TODO:
-            onClick={() => {}}
-            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-          >
-            新增回覆
-          </button>
-        </div>
-        
+      <div className="mb-8">
+        <PostReplySection postId={post.id} />
       </div>
       
       {/* 推薦文章 */}
