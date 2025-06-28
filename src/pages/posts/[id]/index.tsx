@@ -1,112 +1,24 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
-import { usePost } from '../../../contexts/PostContext'
-import type { TextPosition, PostInteraction } from '../../../types/post'
-import { StructuredMarkdownRenderer } from './_content/components/markdownRender/StructuredMarkdownRenderer'
-import { usePostInteractions } from './_content/hooks/usePostInteractions'
-import { useInteractionDialogs } from './_content/hooks/useInteractionDialogs'
-import { ReplyList } from './_content/components/markdownRender/InteractionsList'
-import { InteractionDialogs } from './_content/components/markdownRender/InteractionDialogs'
-import { CommentPopover } from './_content/components/markdownRender/CommentPopover'
-import { HighlightPopover } from './_content/components/markdownRender/HighlightPopover'
-import { usePopover } from './_content/hooks/usePopover'
-import { TextSelectionProvider } from './_content/contexts/TextSelectionContext'
-import { useTextSelection } from './_content/hooks/useTextSelection'
+import { usePostDetail } from '../../../hooks/usePostPage'
+import { StructuredMarkdownRenderer } from '../../../components/MarkdownRender'
+
 
 function PostDetailContent() {
   const { id } = useParams<{ id: string }>()
-  const { 
-    usePostQuery, 
-    setCurrentPost, 
-    getRecommendedPosts, 
-    posts 
-  } = usePost()
   
-  // 使用 TanStack Query 獲取文章數據
-  const { post, isLoading, error } = usePostQuery(id || '')
-  
-  // 互動功能邏輯
+  // 只與 Hook 交互 - 符合架構設計
   const {
-    interactions,
-    replies,
-    addMark,
-    addComment,
-    addReply,
-    removeReply,
-    removeInteraction
-  } = usePostInteractions(post)
+    // 數據狀態
+    post,
+    recommendedPosts,
 
-  // 對話框狀態管理
-  const {
-    showCommentDialog,
-    commentText,
-    setCommentText,
-    openCommentDialog,
-    closeCommentDialog,
-    selectedTextForComment,
-    selectedPositionForComment,
-    showReplyDialog,
-    replyText,
-    setReplyText,
-    openReplyDialog,
-    closeReplyDialog
-  } = useInteractionDialogs()
-
-  // 統一的 popover 管理
-  const {
-    commentState,
-    highlightState,
-    showCommentPopover,
-    showHighlightPopover,
-    closePopover
-  } = usePopover()
-  
-  useEffect(() => {
-    if (post) {
-      setCurrentPost(post)
-    }
-  }, [post, setCurrentPost])
-  
-  // 處理標記
-  const handleMarkAction = (selectedText: string, selectedPosition: TextPosition) => {
-    if (!post) return
-    addMark(post.id, selectedText, selectedPosition)
-  }
-
-  // 處理評論
-  const handleCommentAction = (selectedText: string, selectedPosition: TextPosition) => {
-    if (!post) return
-    openCommentDialog(selectedText, selectedPosition)
-  }
-
-  // 文字選擇管理
-  const { contentRef, handleMark, handleComment } = useTextSelection({
-    onMark: handleMarkAction,
-    onComment: handleCommentAction
-  })
-
-  // 提交評論
-  const handleCommentSubmit = () => {
-    if (!commentText.trim() || !selectedTextForComment || !selectedPositionForComment || !post) return
+    // UI 狀態
+    isLoading,
+    error,
     
-    addComment(post.id, selectedTextForComment, commentText, selectedPositionForComment)
-    closeCommentDialog()
-  }
-
-  // 提交回覆
-  const handleReplySubmit = () => {
-    if (!replyText.trim() || !post) return
-    
-    addReply(post.id, replyText)
-    closeReplyDialog()
-  }
-
-  // 刪除回覆
-  const handleRemoveReply = (replyId: string) => {
-    if (window.confirm('確定要刪除這則回覆嗎？')) {
-      removeReply(replyId)
-    }
-  }
+    // 操作方法
+    clearError,
+  } = usePostDetail(id || '')
   
   if (!id) {
     return <Navigate to="/posts" replace />
@@ -128,35 +40,33 @@ function PostDetailContent() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">文章不存在</h1>
           <p className="text-gray-600 mb-6">
-            {error ? `載入錯誤: ${error.message}` : '抱歉，找不到您要查看的文章。'}
+            {error ? `載入錯誤: ${error}` : '抱歉，找不到您要查看的文章。'}
           </p>
-          <Link 
-            to="/posts"
-            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            返回文章列表
-          </Link>
+          <div className="space-x-4">
+            <Link 
+              to="/posts"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              返回文章列表
+            </Link>
+            {error && (
+              <button
+                onClick={clearError}
+                className="inline-block px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                清除錯誤
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
   }
 
-  // 獲取推薦文章 (複雜業務邏輯)
-  const recommendedPosts = posts.length > 0 ? getRecommendedPosts(post, 3) : []
-
-  // 處理 popover 目標設置
-  const handleCommentTarget = (_element: HTMLElement | null, interaction: PostInteraction) => {
-    showCommentPopover(interaction)
-  }
-
-  const handleHighlightTarget = (_element: HTMLElement | null, interaction: PostInteraction) => {
-    showHighlightPopover(interaction)
-  }
-
   return (
     <div className="container mx-auto px-4 py-8 relative">
-      {/* 返回按鈕 */}
-      <div className="mb-6">
+      {/* 返回按鈕和操作欄 */}
+      <div className="flex items-center justify-between mb-6">
         <Link 
           to="/posts"
           className="inline-flex items-center text-blue-600 hover:text-blue-800 transition-colors"
@@ -165,21 +75,22 @@ function PostDetailContent() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           返回文章列表
-        </Link>
+        </Link> 
       </div>
 
       {/* 文章標題和元數據 */}
       <header className="mb-8">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
-        
-        <div className="flex items-center gap-4 text-gray-600 text-sm mb-4">
-          <span>發布日期: {post.date}</span>
-          {post.author && <span>作者: {post.author}</span>}
+        <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
+          <div>發布日期: {post.date}</div>
+          {post.author && <div>作者: {post.author}</div>}
+          <div>互動數: 0</div>
         </div>
         
+        {/* 標籤 */}
         {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {post.tags.map((tag: string) => (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {post.tags.map(tag => (
               <span 
                 key={tag}
                 className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
@@ -189,121 +100,61 @@ function PostDetailContent() {
             ))}
           </div>
         )}
+
       </header>
 
-      {/* 文章內容 - 使用結構化渲染器 */}
-      <article className="relative" ref={contentRef}>
+      {/* 文章內容區域 */}
+      <div className="prose prose-lg max-w-none mb-8">
+        <div>
           <StructuredMarkdownRenderer 
-            post={post} 
-            interactions={interactions}
-            onCommentTarget={handleCommentTarget}
-            onHighlightTarget={handleHighlightTarget}
-            onMark={handleMark}
-            onComment={handleComment}
+            post={post}
           />
-      </article>
-
-
-      {/* 互動記錄 */}
-      {post && <ReplyList interactions={replies} onRemoveReply={handleRemoveReply} />}
-
-      {/* 回覆按鈕 */}
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <button
-          onClick={openReplyDialog}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          💬 回覆文章
-        </button>
+        </div>
       </div>
 
-      {/* 回覆留言 */}
+      {/* 回覆區域 */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">討論區</h3>
+          <button
+            // TODO:
+            onClick={() => {}}
+            className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+          >
+            新增回覆
+          </button>
+        </div>
+        
+      </div>
       
-
-
       {/* 推薦文章 */}
       {recommendedPosts.length > 0 && (
-        <section className="mt-12 pt-8 border-t border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">推薦文章</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <h3 className="text-lg font-semibold mb-4">推薦文章</h3>
+          <div className="space-y-3">
             {recommendedPosts.map(recommendedPost => (
-              <div key={recommendedPost.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <h3 className="font-semibold mb-2">
-                  <Link 
-                    to={`/posts/${recommendedPost.id}`}
-                    className="text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    {recommendedPost.title}
-                  </Link>
-                </h3>
-                <div className="text-gray-600 text-sm mb-2">
+              <Link
+                key={recommendedPost.id}
+                to={`/posts/${recommendedPost.id}`}
+                className="block p-3 border rounded hover:bg-gray-50 transition-colors"
+              >
+                <h4 className="font-medium text-gray-900 mb-1">
+                  {recommendedPost.title}
+                </h4>
+                <p className="text-sm text-gray-600">
                   {recommendedPost.date}
-                </div>
-                {recommendedPost.tags && (
-                  <div className="flex flex-wrap gap-1">
-                    {recommendedPost.tags.slice(0, 3).map(tag => (
-                      <span 
-                        key={tag}
-                        className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+                </p>
+              </Link>
             ))}
           </div>
-        </section>
+        </div>
       )}
-
-      {/* 返回按鈕 */}
-      <div className="mt-12 pt-8 border-t border-gray-200">
-        <Link 
-          to="/posts"
-          className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          返回文章列表
-        </Link>
-      </div>
-
-      {/* 對話框 */}
-      <InteractionDialogs
-        showCommentDialog={showCommentDialog}
-        commentText={commentText}
-        selectedText={selectedTextForComment || ''}
-        onCommentTextChange={setCommentText}
-        onCommentSubmit={handleCommentSubmit}
-        onCommentCancel={closeCommentDialog}
-        showReplyDialog={showReplyDialog}
-        replyText={replyText}
-        onReplyTextChange={setReplyText}
-        onReplySubmit={handleReplySubmit}
-        onReplyCancel={closeReplyDialog}
-      />
-
-      <CommentPopover
-        interaction={commentState.data?.interaction || null}
-        position={commentState.data?.position || null}
-        show={commentState.isActive}
-        onClose={closePopover}
-      />
-
-      <HighlightPopover
-        interaction={highlightState.data?.interaction || null}
-        position={highlightState.data?.position || null}
-        show={highlightState.isActive}
-        onClose={closePopover}
-        onRemove={removeInteraction}
-      />
     </div>
   )
 }
 
 export default function PostDetail() {
   return (
-    <TextSelectionProvider>
       <PostDetailContent />
-    </TextSelectionProvider>
   )
 } 

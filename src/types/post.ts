@@ -67,4 +67,15 @@ export interface ContentNode {
     content: string
     children?: ContentNode[]
     interactions?: PostInteraction[]
+}
+
+/**
+ * 創建文章數據類型
+ */
+export interface CreatePostData {
+    title: string
+    content: string
+    author: string
+    tags?: string[]
+    date?: string // 可選，默認為當前時間
 } 

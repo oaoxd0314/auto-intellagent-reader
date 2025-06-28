@@ -1,10 +1,27 @@
 import { AbstractController } from './AbstractController'
 import type { Post, PostInteraction, TextPosition } from '../types/post'
+import { PostService } from '../services/PostService'
 
 /**
  * 文章控制器狀態
  */
 interface PostControllerState {
+    // 數據緩存
+    posts: Post[]
+    postsCache: Map<string, Post>
+    tags: string[]
+
+    // 載入狀態
+    isLoadingPosts: boolean
+    isLoadingPost: boolean
+    isLoadingTags: boolean
+
+    // 錯誤狀態
+    postsError: string | null
+    postError: string | null
+    tagsError: string | null
+
+    // 業務狀態
     currentPost: Post | null
     searchFilters: {
         tag?: string
@@ -12,22 +29,47 @@ interface PostControllerState {
     }
     viewMode: 'list' | 'grid' | 'detail'
     interactions: PostInteraction[]
+
+    // 緩存控制
+    postsLastFetched: number | null
+    tagsLastFetched: number | null
+    cacheTimeout: number
 }
 
 /**
- * 文章控制器 - 處理複雜業務邏輯
- * 負責協調文章相關的複雜業務流程和狀態管理
- * 簡單的 CRUD 操作由 TanStack Query 處理
+ * 文章控制器 - 完整的數據管理和業務邏輯協調
+ * 替代 TanStack Query，提供統一的數據管理接口
  */
 export class PostController extends AbstractController<PostControllerState> {
     private static instance: PostController | null = null
 
     constructor() {
         super('PostController', {
+            // 數據緩存
+            posts: [],
+            postsCache: new Map(),
+            tags: [],
+
+            // 載入狀態
+            isLoadingPosts: false,
+            isLoadingPost: false,
+            isLoadingTags: false,
+
+            // 錯誤狀態
+            postsError: null,
+            postError: null,
+            tagsError: null,
+
+            // 業務狀態
             currentPost: null,
             searchFilters: {},
             viewMode: 'list',
-            interactions: []
+            interactions: [],
+
+            // 緩存控制
+            postsLastFetched: null,
+            tagsLastFetched: null,
+            cacheTimeout: 5 * 60 * 1000 // 5分鐘緩存
         }, {
             enableLogging: true,
             debugMode: false
@@ -46,11 +88,230 @@ export class PostController extends AbstractController<PostControllerState> {
 
     protected onInitialize(): void {
         this.log('PostController initialized')
+        this.loadInteractions()
     }
 
     protected onDestroy(): void {
         this.log('PostController destroyed')
         PostController.instance = null
+    }
+
+    /**
+     * 檢查緩存是否有效
+     */
+    private isCacheValid(lastFetched: number | null): boolean {
+        if (!lastFetched) return false
+        return Date.now() - lastFetched < this.state.cacheTimeout
+    }
+
+    /**
+     * 獲取所有文章
+     */
+    async getAllPosts(forceRefresh: boolean = false): Promise<Post[]> {
+        if (this.state.isDestroyed) return []
+
+        // 檢查緩存
+        if (!forceRefresh && this.state.posts.length > 0 && this.isCacheValid(this.state.postsLastFetched)) {
+            return this.state.posts
+        }
+
+        this.setState({
+            isLoadingPosts: true,
+            postsError: null
+        })
+
+        try {
+            const posts = await PostService.getAllPosts()
+
+            // 更新緩存
+            const postsCache = new Map()
+            posts.forEach(post => postsCache.set(post.id, post))
+
+            this.setState({
+                posts,
+                postsCache,
+                postsLastFetched: Date.now(),
+                isLoadingPosts: false,
+                postsError: null
+            })
+
+            this.emit('postsLoaded', posts)
+            return posts
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '載入文章失敗'
+            this.setState({
+                isLoadingPosts: false,
+                postsError: errorMessage
+            })
+            this.emit('postsError', errorMessage)
+            throw error
+        }
+    }
+
+    /**
+     * 獲取單個文章
+     */
+    async getPostById(id: string, forceRefresh: boolean = false): Promise<Post | null> {
+        if (this.state.isDestroyed) return null
+
+        // 檢查緩存
+        if (!forceRefresh && this.state.postsCache.has(id)) {
+            const cachedPost = this.state.postsCache.get(id)!
+            this.setCurrentPost(cachedPost)
+            return cachedPost
+        }
+
+        this.setState({
+            isLoadingPost: true,
+            postError: null
+        })
+
+        try {
+            const post = await PostService.getPostById(id)
+
+            if (post) {
+                // 更新緩存
+                const newCache = new Map(this.state.postsCache)
+                newCache.set(id, post)
+                this.setState({
+                    postsCache: newCache,
+                    isLoadingPost: false,
+                    postError: null
+                })
+
+                this.setCurrentPost(post)
+                this.emit('postLoaded', post)
+            } else {
+                this.setState({
+                    isLoadingPost: false,
+                    postError: '文章不存在'
+                })
+            }
+
+            return post ?? null
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '載入文章失敗'
+            this.setState({
+                isLoadingPost: false,
+                postError: errorMessage
+            })
+            this.emit('postError', errorMessage)
+            throw error
+        }
+    }
+
+    /**
+     * 獲取所有標籤
+     */
+    async getAllTags(forceRefresh: boolean = false): Promise<string[]> {
+        if (this.state.isDestroyed) return []
+
+        // 檢查緩存
+        if (!forceRefresh && this.state.tags.length > 0 && this.isCacheValid(this.state.tagsLastFetched)) {
+            return this.state.tags
+        }
+
+        this.setState({
+            isLoadingTags: true,
+            tagsError: null
+        })
+
+        try {
+            const tags = await PostService.getAllTags()
+
+            this.setState({
+                tags,
+                tagsLastFetched: Date.now(),
+                isLoadingTags: false,
+                tagsError: null
+            })
+
+            this.emit('tagsLoaded', tags)
+            return tags
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '載入標籤失敗'
+            this.setState({
+                isLoadingTags: false,
+                tagsError: errorMessage
+            })
+            this.emit('tagsError', errorMessage)
+            throw error
+        }
+    }
+
+    /**
+     * 清除錯誤狀態
+     */
+    clearErrors(): void {
+        this.setState({
+            postsError: null,
+            postError: null,
+            tagsError: null
+        })
+    }
+
+    /**
+     * 清除特定錯誤
+     */
+    clearError(type: 'posts' | 'post' | 'tags'): void {
+        this.setState({
+            [`${type}Error`]: null
+        } as Partial<PostControllerState>)
+    }
+
+    /**
+     * 獲取載入狀態
+     */
+    getLoadingState(): {
+        isLoadingPosts: boolean
+        isLoadingPost: boolean
+        isLoadingTags: boolean
+        isLoadingAny: boolean
+    } {
+        return {
+            isLoadingPosts: this.state.isLoadingPosts,
+            isLoadingPost: this.state.isLoadingPost,
+            isLoadingTags: this.state.isLoadingTags,
+            isLoadingAny: this.state.isLoadingPosts || this.state.isLoadingPost || this.state.isLoadingTags
+        }
+    }
+
+    /**
+     * 獲取錯誤狀態
+     */
+    getErrorState(): {
+        postsError: string | null
+        postError: string | null
+        tagsError: string | null
+        hasAnyError: boolean
+    } {
+        return {
+            postsError: this.state.postsError,
+            postError: this.state.postError,
+            tagsError: this.state.tagsError,
+            hasAnyError: !!(this.state.postsError || this.state.postError || this.state.tagsError)
+        }
+    }
+
+    /**
+     * 獲取緩存的文章
+     */
+    getCachedPosts(): Post[] {
+        return [...this.state.posts]
+    }
+
+    /**
+     * 獲取緩存的標籤
+     */
+    getCachedTags(): string[] {
+        return [...this.state.tags]
+    }
+
+    /**
+     * 獲取緩存的文章
+     */
+    getCachedPost(id: string): Post | null {
+        return this.state.postsCache.get(id) ?? null
     }
 
     /**
