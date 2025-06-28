@@ -294,25 +294,28 @@ const generateSectionId = (element: Element, index: number): string => {
 - [x] 在文章詳情頁整合
 - [x] 實時互動統計顯示
 
-### 階段 3: Selection 基礎功能 (第 4 週)
-- [ ] 實作 useSelectionSection hook
-- [ ] 修改 MarkdownRender 支援 section 互動
-- [ ] 實作文字選擇檢測和 ID 生成
+### ✅ 階段 3: Selection 基礎功能 (已完成)
+- [x] 實作 useSelectionSection hook
+- [x] 修改 MarkdownRender 支援 section 互動
+- [x] 實作文字選擇檢測和 ID 生成
+- [x] 創建 SelectionPopover 組件
+- [x] 實作 absolute positioning 定位系統
 
-### 階段 4: Comment Section 功能 (第 5-6 週)
+### ✅ 階段 4: Highlight Section 功能 (已完成)
+- [x] 實作 useMarkSection hook
+- [x] 整合 Highlight 功能到 MarkdownRender
+- [x] 實作精確文字高亮效果
+- [x] 文字選擇浮動工具列 (Medium 風格)
+- [x] 高亮統計和視覺反饋
+
+### 階段 5: Comment Section 功能 (規劃中)
 - [ ] 實作 useCommentSection hook
 - [ ] 創建 CommentPopover 組件
 - [ ] 創建 CommentForm 組件
-- [ ] 整合到 MarkdownRender
-
-### 階段 5: Highlight Section 功能 (第 7 週)
-- [ ] 實作 useMarkSection hook
-- [ ] 創建 HighlightPopover 組件
-- [ ] 實作視覺高亮效果
-- [ ] 整合到 MarkdownRender
+- [ ] 整合評論功能到 SelectionPopover
 
 ### 階段 6: 統計和優化 (第 8 週)
-- [ ] 實作互動統計顯示
+- [ ] 完善互動統計顯示
 - [ ] 性能優化和錯誤處理
 - [ ] UI/UX 細節改進
 - [ ] 測試和文檔完善
@@ -423,4 +426,63 @@ useEffect(() => {
 5. 測試刪除回覆功能
 
 **下一步：**
-準備實作 Selection 基礎功能和 Comment Section 功能。 
+準備實作 Selection 基礎功能和 Comment Section 功能。
+
+### Selection 基礎功能 (完整實作)
+
+**架構組件：**
+- `useSelectionSection` - 文字選擇邏輯 Hook (支援 absolute positioning)
+- `SelectionPopover` - 文字選擇浮動工具列 (Medium 風格)
+- `StructuredMarkdownRenderer` - 整合選擇功能的 Markdown 渲染器
+
+**核心功能：**
+- ✅ 精確文字選擇檢測 (collapsed range 定位)
+- ✅ 段落 ID 自動生成 (穩定 hash 算法)
+- ✅ Container 相對定位系統 (absolute positioning)
+- ✅ 選擇範圍驗證 (最小字數、有效性檢查)
+- ✅ 事件處理優化 (mouseup + click 組合)
+- ✅ Popover 智能定位 (選擇起點精確對齊)
+
+**技術特性：**
+- ✅ TypeScript 完整類型支援
+- ✅ 事件清理和記憶體管理
+- ✅ 延遲清除機制 (給 Popover 操作留時間)
+- ✅ 邊界檢查和錯誤處理
+
+### Highlight Section 功能 (完整實作)
+
+**架構組件：**
+- `useMarkSection` - 高亮管理 Hook
+- 整合到 `SelectionPopover` - 高亮按鈕和操作
+- 整合到 `StructuredMarkdownRenderer` - 視覺高亮渲染
+
+**核心功能：**
+- ✅ 精確文字高亮 (TreeWalker + Range API)
+- ✅ 高亮數據持久化 (localStorage)
+- ✅ 重複高亮檢測 (避免重複標記)
+- ✅ 高亮統計顯示 (實時計數)
+- ✅ 高亮視覺效果 (黃色背景 + 圓角)
+- ✅ DOM 節點管理 (動態插入/移除 mark 標籤)
+
+**UI/UX 特性：**
+- ✅ Medium 風格選擇工具列
+- ✅ 高亮按鈕狀態管理 (載入中、已高亮檢測)
+- ✅ 高亮統計角標顯示
+- ✅ 選擇文字預覽 (截斷顯示)
+- ✅ 操作按鈕分組 (高亮/評論/關閉)
+
+**數據持久化：**
+- 使用 localStorage 存儲
+- 支援跨頁面狀態同步
+- 事件驅動的實時更新
+
+**測試方式：**
+1. 進入任一文章詳情頁
+2. 選擇文章中的任意文字 (至少 3 個字)
+3. 查看浮動工具列出現
+4. 點擊「高亮」按鈕進行標記
+5. 重新載入頁面驗證高亮持久化
+6. 查看右上角高亮統計更新
+
+**下一步：**
+準備實作 Comment Section 功能，整合評論表單到 SelectionPopover。 

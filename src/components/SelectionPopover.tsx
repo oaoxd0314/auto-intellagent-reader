@@ -36,7 +36,6 @@ export function SelectionPopover({
     ? `${selectedText.slice(0, maxTextLength)}...` 
     : selectedText
 
-  // 簡化定位邏輯 - 直接使用傳入的 position（已經是 container 相對座標）
   const popoverWidth = 200
   const popoverHeight = 80
   
