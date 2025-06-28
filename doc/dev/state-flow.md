@@ -618,7 +618,7 @@ function InteractionProvider({ children }: { children: React.ReactNode }) {
    ↓
 5. Controller 調用: PostService.getPostById('post-123')
    ↓
-6. Service 調用: PostDataSource.loadPostById('post-123')
+6. Service 調用: PostService.loadPostById('post-123')
    ↓
 7. 數據返回: MDX 文件解析結果
    ↓

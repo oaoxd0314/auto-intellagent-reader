@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { usePostsList } from '../../hooks/usePostPage'
-import InteractionStats from '../../components/InteractionStats'
 
 export default function PostsIndex() {
   // 只與 Hook 交互 - 符合架構設計
@@ -13,13 +12,11 @@ export default function PostsIndex() {
     searchTerm,
     selectedTag,
     isLoading,
-    isRefreshing,
     error,
     
     // 操作方法
     setSearchTerm,
     setSelectedTag,
-    refreshPosts,
     clearError,
     
     // 統計資訊
@@ -126,11 +123,6 @@ export default function PostsIndex() {
             <div className="text-gray-600 text-sm mb-3">
               <div>發布日期: {post.date}</div>
               {post.author && <div>作者: {post.author}</div>}
-            </div>
-            
-            {/* 互動統計 */}
-            <div className="mb-3">
-              <InteractionStats postId={post.id} size="sm" />
             </div>
             
             {post.tags && post.tags.length > 0 && (

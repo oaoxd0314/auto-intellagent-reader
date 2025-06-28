@@ -360,7 +360,7 @@ export function CustomMDXProvider({ children }: CustomMDXProviderProps)
 - ✅ 配置 Vite 支援 MDX
 
 ### Phase 2: 數據源整合 ✅
-- ✅ 實作 `PostDataSource` 服務
+- ✅ 實作 `PostService` 服務
 - ✅ 更新 `src/data/posts.ts` 使用真正的數據源
 - ✅ 測試文章列表和詳情頁面
 - ✅ 處理文件讀取錯誤

@@ -1,14 +1,8 @@
 import { useEffect, useRef } from 'react'
-import type { Post, PostInteraction } from '../../types/post'
-import { useTextMarking } from '../../hooks/useTextMarking'
+import type { Post } from '../types/post'
 
 interface StructuredMarkdownRendererProps {
   post: Post
-  interactions: PostInteraction[]
-  onCommentTarget: (element: HTMLElement, interaction: PostInteraction) => void
-  onHighlightTarget: (element: HTMLElement, interaction: PostInteraction) => void
-  onMark: () => void
-  onComment: () => void
 }
 
 /**
@@ -16,26 +10,9 @@ interface StructuredMarkdownRendererProps {
  * 只負責 markdown 內容渲染和互動標記顯示
  */
 export function StructuredMarkdownRenderer({ 
-  post, 
-  interactions,
-  onCommentTarget,
-  onHighlightTarget,
-  onMark,
-  onComment
+  post,
 }: StructuredMarkdownRendererProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
-
-  // 文字標記邏輯
-  useTextMarking({
-    interactions,
-    contentRef,
-    onCommentClick: (interaction) => {
-      onCommentTarget(null as any, interaction)
-    },
-    onHighlightClick: (interaction) => {
-      onHighlightTarget(null as any, interaction)
-    }
-  })
 
   // 為段落添加 ID
   useEffect(() => {

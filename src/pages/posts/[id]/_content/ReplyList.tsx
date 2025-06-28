@@ -1,11 +1,6 @@
-import type { PostInteraction } from '../../types/post'
+import { PostInteraction } from "@/types/post"
 
-export interface ReplyListProps {
-  interactions: PostInteraction[] // 現在這裡只會是 reply 類型的互動
-  onRemoveReply?: (replyId: string) => void
-}
-
-export function ReplyList({ interactions: replies, onRemoveReply }: ReplyListProps) {
+export function ReplyList({ interactions: replies, onRemoveReply }: { interactions: PostInteraction[], onRemoveReply?: (replyId: string) => void }) {
   if (replies.length === 0) {
     return (
       <div className="mt-8 pt-6 border-t border-gray-200">

@@ -73,20 +73,53 @@
 
 /* 隱藏原生文字選擇 */
 .hide-native-selection *::selection {
-  background: transparent;
+  background: transparent !important;
+  color: inherit !important;
 }
 
 .hide-native-selection *::-moz-selection {
-  background: transparent;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.hide-native-selection {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* 確保文字仍然可以被選擇，但不顯示原生 UI */
+.hide-native-selection * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 /* 自定義選擇覆蓋層 */
 .custom-selection-overlay {
-  background-color: rgba(59, 130, 246, 0.3);
-  border-radius: 2px;
-  pointer-events: none;
-  position: absolute;
-  z-index: 40;
+  background-color: rgba(59, 130, 246, 0.3) !important;
+  border: 1px solid rgba(59, 130, 246, 0.5) !important;
+  border-radius: 2px !important;
+  pointer-events: none !important;
+  position: fixed !important;
+  z-index: 40 !important;
+  transition: opacity 0.2s ease !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* 確保覆蓋層不會被其他元素遮蓋 */
+.custom-selection-overlay {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* 調試用：讓覆蓋層更明顯 */
+.custom-selection-overlay {
+  background-color: rgba(255, 0, 0, 0.3) !important;
+  border: 2px solid rgba(255, 0, 0, 0.8) !important;
 }
 
 /* 互動標記樣式 */
@@ -155,4 +188,55 @@
 .comment-actions-popover,
 .comment-view-popover {
   z-index: 1000;
+}
+
+/* 選擇選單動畫 */
+.selection-menu {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 確保文字可以被選擇 */
+.prose {
+  user-select: text;
+}
+
+/* 互動標記樣式 */
+.interaction-mark {
+  position: relative;
+  cursor: pointer;
+}
+
+.interaction-mark.highlight {
+  background-color: rgba(255, 235, 59, 0.3);
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.interaction-mark.comment {
+  background-color: rgba(33, 150, 243, 0.2);
+  border-radius: 2px;
+  padding: 1px 2px;
+  border-left: 3px solid rgba(33, 150, 243, 0.6);
+}
+
+.interaction-mark.comment::after {
+  content: '💬';
+  margin-left: 4px;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.interaction-mark:hover {
+  opacity: 0.8;
 } 

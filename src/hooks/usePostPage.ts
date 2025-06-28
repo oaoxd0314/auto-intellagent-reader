@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PostController } from '../controllers/PostController'
-import type { Post } from '../types/post'
 
 /**
  * Posts 列表頁面的 Hook
@@ -12,7 +11,6 @@ export function usePostsList() {
     // UI 狀態 - 由 Hook 管理
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedTag, setSelectedTag] = useState<string | null>(null)
-    const [isRefreshing, setIsRefreshing] = useState(false)
 
     // 從 Controller 獲取狀態
     const loadingState = controller.getLoadingState()
@@ -43,21 +41,6 @@ export function usePostsList() {
         loadInitialData()
     }, [controller])
 
-    // 重新整理功能
-    const refreshPosts = useCallback(async () => {
-        setIsRefreshing(true)
-        try {
-            await Promise.all([
-                controller.getAllPosts(true), // 強制重新載入
-                controller.getAllTags(true)
-            ])
-        } catch (error) {
-            console.error('Failed to refresh posts:', error)
-        } finally {
-            setIsRefreshing(false)
-        }
-    }, [controller])
-
     // 清除錯誤
     const clearError = useCallback(() => {
         controller.clearErrors()
@@ -86,13 +69,11 @@ export function usePostsList() {
         searchTerm,
         selectedTag,
         isLoading: loadingState.isLoadingPosts || loadingState.isLoadingTags,
-        isRefreshing,
         error: errorState.postsError || errorState.tagsError,
 
         // 操作方法
         setSearchTerm: handleSearch,
         setSelectedTag: handleTagSelect,
-        refreshPosts,
         clearError,
 
         // 統計資訊
@@ -108,8 +89,6 @@ export function usePostsList() {
 export function usePostDetail(id: string) {
     const controller = PostController.getInstance()
 
-    // UI 狀態 - 由 Hook 管理
-    const [isRefreshing, setIsRefreshing] = useState(false)
 
     // 從 Controller 獲取狀態
     const loadingState = controller.getLoadingState()
@@ -119,8 +98,6 @@ export function usePostDetail(id: string) {
 
     // 業務邏輯 - 通過 Controller 處理
     const recommendedPosts = post ? controller.getRecommendedPosts(post, allPosts, 3) : []
-    const interactions = post ? controller.getInteractions(post.id) : []
-    const interactionStats = controller.getInteractionStats(post?.id)
 
     // 初始化載入文章
     useEffect(() => {
@@ -141,69 +118,24 @@ export function usePostDetail(id: string) {
         loadPost()
     }, [id, controller, allPosts.length])
 
-    // 重新整理功能
-    const refreshPost = useCallback(async () => {
-        if (!id) return
 
-        setIsRefreshing(true)
-        try {
-            await controller.getPostById(id, true) // 強制重新載入
-        } catch (error) {
-            console.error('Failed to refresh post:', error)
-        } finally {
-            setIsRefreshing(false)
-        }
-    }, [id, controller])
 
     // 清除錯誤
     const clearError = useCallback(() => {
         controller.clearError('post')
     }, [controller])
 
-    // 互動操作 - 委託給 Controller
-    const addMark = useCallback((selectedText: string, position: any) => {
-        if (!post) return
-        controller.addMark(post.id, selectedText, position)
-    }, [controller, post])
-
-    const addComment = useCallback((selectedText: string, content: string, position: any) => {
-        if (!post) return
-        controller.addComment(post.id, selectedText, content, position)
-    }, [controller, post])
-
-    const addReply = useCallback((content: string) => {
-        if (!post) return
-        controller.addReply(post.id, content)
-    }, [controller, post])
-
-    const removeInteraction = useCallback((interactionId: string) => {
-        controller.removeInteraction(interactionId)
-    }, [controller])
-
     return {
         // 數據狀態
         post,
         recommendedPosts,
-        interactions,
-        interactionStats,
 
         // UI 狀態
         isLoading: loadingState.isLoadingPost,
-        isRefreshing,
+
         error: errorState.postError,
 
-        // 操作方法
-        refreshPost,
         clearError,
-        addMark,
-        addComment,
-        addReply,
-        removeInteraction,
-
-        // 便利方法
-        replies: interactions.filter(i => i.type === 'reply'),
-        marks: interactions.filter(i => i.type === 'mark'),
-        comments: interactions.filter(i => i.type === 'comment')
     }
 }
 

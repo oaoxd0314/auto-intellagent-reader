@@ -579,25 +579,26 @@ class HighlightFactory {
 
 ```typescript
 class PostService {
-  // 純數據操作，可直接替換成 API 調用
+  // 文章數據操作和業務邏輯
   static async getAllPosts(): Promise<Post[]> {
-    return PostDataSource.loadAllPosts()
+    // 直接從 MDX 文件載入或 API 調用
+    return this.loadAllPosts()
   }
   
   static async getPostById(id: string): Promise<Post | undefined> {
-    return PostDataSource.loadPostById(id)
+    return this.loadPostById(id)
   }
   
   static async savePost(post: Post): Promise<void> {
-    return PostDataSource.save(post)
+    return this.save(post)
   }
   
   static async deletePost(id: string): Promise<void> {
-    return PostDataSource.delete(id)
+    return this.delete(id)
   }
   
   static getAvailablePostIds(): string[] {
-    return PostDataSource.getAvailableIds()
+    return this.getAvailableIds()
   }
 }
 
@@ -631,7 +632,7 @@ class InteractionService {
 1. UI 調用 usePostDetail(id)
 2. Hook 調用 Controller.getPostById(id)
 3. Controller 檢查快取 → 調用 PostService.getPostById(id)
-4. PostService 調用 PostDataSource.loadPostById(id)
+4. PostService 調用內部方法載入文章數據
 5. 數據通過 PostFactory.addMetadata() 處理
 6. Controller 更新快取和 Context 狀態
 7. Hook 返回數據給 UI

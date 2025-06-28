@@ -267,10 +267,9 @@ export class PostFactory {
 
 ```
 services/
-├── PostService.ts           # 文章數據服務
+├── PostService.ts           # 文章服務 (已存在)
 ├── InteractionService.ts   # 互動數據服務
 ├── BehaviorService.ts      # 行為追蹤服務 (已存在)
-├── PostDataSource.ts      # 文章數據源 (已存在)
 └── index.ts               # Service 統一導出
 ```
 
@@ -278,25 +277,26 @@ services/
 ```typescript
 // services/PostService.ts
 export class PostService {
-  // 純數據操作，可直接替換成 API 調用
+  // 文章數據操作和業務邏輯
   static async getAllPosts(): Promise<Post[]> {
-    return PostDataSource.loadAllPosts()
+    // 直接從 MDX 文件載入或 API 調用
+    return this.loadAllPosts()
   }
   
   static async getPostById(id: string): Promise<Post | undefined> {
-    return PostDataSource.loadPostById(id)
+    return this.loadPostById(id)
   }
   
   static async savePost(post: Post): Promise<void> {
-    return PostDataSource.save(post)
+    return this.save(post)
   }
   
   static async deletePost(id: string): Promise<void> {
-    return PostDataSource.delete(id)
+    return this.delete(id)
   }
   
   static getAvailablePostIds(): string[] {
-    return PostDataSource.getAvailableIds()
+    return this.getAvailableIds()
   }
 }
 ```

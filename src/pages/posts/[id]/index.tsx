@@ -1,21 +1,7 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
-import { useState } from 'react'
 import { usePostDetail } from '../../../hooks/usePostPage'
-import type { PostInteraction } from '../../../types/post'
-import { StructuredMarkdownRenderer } from '../../../components/markdownRender/StructuredMarkdownRenderer'
-import { ReplyList } from '../../../components/markdownRender/InteractionsList'
-import { InteractionDialogs } from '../../../components/markdownRender/InteractionDialogs'
-import { 
-  TextSelectionMenu, 
-  MarkActionsMenu, 
-  CommentActionsMenu, 
-  CommentView 
-} from '../../../components/markdownRender/InteractionMenu'
-import { usePopover } from '../../../hooks/usePopover'
-import { TextSelectionProvider } from '../../../contexts/TextSelectionContext'
-import { useTextSelection } from '../../../hooks/useTextSelection'
-import { useTextMarking } from '../../../hooks/useTextMarking'
-import { useTextSelectionContext } from '../../../contexts/TextSelectionContext'
+import { StructuredMarkdownRenderer } from '../../../components/MarkdownRender'
+
 
 function PostDetailContent() {
   const { id } = useParams<{ id: string }>()
@@ -25,125 +11,14 @@ function PostDetailContent() {
     // 數據狀態
     post,
     recommendedPosts,
-    interactions,
-    interactionStats,
-    replies,
-    
+
     // UI 狀態
     isLoading,
     error,
     
     // 操作方法
     clearError,
-    addMark,
-    addComment,
-    addReply,
-    removeInteraction
   } = usePostDetail(id || '')
-
-  // 對話框狀態
-  const [showCommentDialog, setShowCommentDialog] = useState(false)
-  const [showReplyDialog, setShowReplyDialog] = useState(false)
-  const [commentText, setCommentText] = useState('')
-  const [replyText, setReplyText] = useState('')
-  
-  // 保存評論相關的選擇狀態
-  const [savedSelectedText, setSavedSelectedText] = useState('')
-  const [savedSelectedPosition, setSavedSelectedPosition] = useState<any>(null)
-  
-  // 對話框操作
-  const openCommentDialog = () => {
-    console.log('打開評論對話框')
-    setShowCommentDialog(true)
-  }
-  const closeCommentDialog = () => {
-    setShowCommentDialog(false)
-    setCommentText('')
-    setSavedSelectedText('')
-    setSavedSelectedPosition(null)
-  }
-  const openReplyDialog = () => setShowReplyDialog(true)
-  const closeReplyDialog = () => {
-    setShowReplyDialog(false)
-    setReplyText('')
-  }
-  
-  // 驗證
-  const canSubmitComment = commentText.trim().length >= 3
-  const canSubmitReply = replyText.trim().length >= 3
-
-  // 統一的 popover 管理
-  const {
-    textSelectionMenuState,
-    markActionsState,
-    commentActionsState,
-    commentViewState,
-    showTextSelectionMenu,
-    showMarkActions,
-    showCommentActions,
-    showCommentView,
-    closePopover
-  } = usePopover()
-  
-  // 文字選擇狀態
-  const selectionContext = useTextSelectionContext()
-  
-  // 處理標記操作
-  const handleMarkAction = (selectedText: string, selectedPosition: any) => {
-    addMark(selectedText, selectedPosition)
-    closePopover()
-  }
-
-  // 處理評論操作
-  const handleCommentAction = (selectedText: string, selectedPosition: any) => {
-    console.log('評論操作被觸發:', { selectedText, selectedPosition })
-    // 保存選擇的文字和位置
-    setSavedSelectedText(selectedText)
-    setSavedSelectedPosition(selectedPosition)
-    closePopover()
-    openCommentDialog()
-  }
-
-  // 文字選擇管理
-  const { contentRef, handleMark: handleMarkClick, handleComment: handleCommentClick } = useTextSelection({
-    onMark: handleMarkAction,
-    onComment: handleCommentAction,
-    showPopover: (data) => {
-      showTextSelectionMenu(data)
-    }
-  })
-
-  // 文字標記管理
-  useTextMarking({
-    interactions,
-    contentRef,
-    onHighlightClick: showMarkActions,
-    onCommentClick: showCommentActions,
-    onCommentView: showCommentView
-  })
-
-  // 提交評論
-  const handleCommentSubmit = () => {
-    if (!canSubmitComment || !savedSelectedText || !savedSelectedPosition) return
-    
-    addComment(savedSelectedText, commentText, savedSelectedPosition)
-    closeCommentDialog()
-  }
-
-  // 提交回覆
-  const handleReplySubmit = () => {
-    if (!canSubmitReply) return
-    
-    addReply(replyText)
-    closeReplyDialog()
-  }
-
-  // 刪除回覆
-  const handleRemoveReply = (replyId: string) => {
-    if (window.confirm('確定要刪除這則回覆嗎？')) {
-      removeInteraction(replyId)
-    }
-  }
   
   if (!id) {
     return <Navigate to="/posts" replace />
@@ -209,7 +84,7 @@ function PostDetailContent() {
         <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
           <div>發布日期: {post.date}</div>
           {post.author && <div>作者: {post.author}</div>}
-          <div>互動數: {interactionStats.totalInteractions}</div>
+          <div>互動數: 0</div>
         </div>
         
         {/* 標籤 */}
@@ -230,19 +105,11 @@ function PostDetailContent() {
 
       {/* 文章內容區域 */}
       <div className="prose prose-lg max-w-none mb-8">
-        <div 
-          ref={contentRef}
-        >
+        <div>
           <StructuredMarkdownRenderer 
             post={post}
-            interactions={interactions}
-            onCommentTarget={() => {}} // 不再需要
-            onHighlightTarget={() => {}} // 不再需要
-            onMark={handleMarkClick}
-            onComment={handleCommentClick}
           />
         </div>
-
       </div>
 
       {/* 回覆區域 */}
@@ -250,17 +117,14 @@ function PostDetailContent() {
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">討論區</h3>
           <button
-            onClick={openReplyDialog}
+            // TODO:
+            onClick={() => {}}
             className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
           >
             新增回覆
           </button>
         </div>
         
-        <ReplyList 
-          interactions={replies}
-          onRemoveReply={handleRemoveReply}
-        />
       </div>
       
       {/* 推薦文章 */}
@@ -285,61 +149,12 @@ function PostDetailContent() {
           </div>
         </div>
       )}
-      
-      {/* 新的 Popover 系統 */}
-      <TextSelectionMenu
-        show={textSelectionMenuState.isActive}
-        position={textSelectionMenuState.data?.position}
-        onMark={textSelectionMenuState.data?.data?.onMark || (() => {})}
-        onComment={textSelectionMenuState.data?.data?.onComment || (() => {})}
-        onClose={closePopover}
-      />
-
-      <MarkActionsMenu
-        show={markActionsState.isActive}
-        position={markActionsState.data?.position}
-        interaction={markActionsState.data?.interaction}
-        onRemove={removeInteraction}
-        onClose={closePopover}
-      />
-
-      <CommentActionsMenu
-        show={commentActionsState.isActive}
-        position={commentActionsState.data?.position}
-        interaction={commentActionsState.data?.interaction}
-        onRemove={removeInteraction}
-        onClose={closePopover}
-      />
-
-      <CommentView
-        show={commentViewState.isActive}
-        position={commentViewState.data?.position}
-        interaction={commentViewState.data?.interaction}
-        onClose={closePopover}
-      />
-      
-      {/* 對話框 */}
-      <InteractionDialogs
-        showCommentDialog={showCommentDialog}
-        commentText={commentText}
-        selectedText={savedSelectedText}
-        onCommentTextChange={setCommentText}
-        onCommentSubmit={handleCommentSubmit}
-        onCommentCancel={closeCommentDialog}
-        showReplyDialog={showReplyDialog}
-        replyText={replyText}
-        onReplyTextChange={setReplyText}
-        onReplySubmit={handleReplySubmit}
-        onReplyCancel={closeReplyDialog}
-      />
     </div>
   )
 }
 
 export default function PostDetail() {
   return (
-    <TextSelectionProvider>
       <PostDetailContent />
-    </TextSelectionProvider>
   )
 } 
