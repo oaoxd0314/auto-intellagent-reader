@@ -1,6 +1,5 @@
-import { createContext, useContext, useEffect, useReducer, useRef, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useReducer, useRef, useCallback, useState, type ReactNode } from 'react'
 import { PostController } from '../controllers/PostController'
-import { useAllPosts, useAllTags, usePostDetail } from '../hooks/usePostQueries'
 import type { Post } from '../types/post'
 
 /**
@@ -39,19 +38,19 @@ interface PostContextValue {
     // 狀態
     state: PostContextState
     
-    // TanStack Query 數據
+    // Controller 數據
     posts: Post[]
     tags: string[]
     isPostsLoading: boolean
     isTagsLoading: boolean
-    postsError: Error | null
-    tagsError: Error | null
+    postsError: string | null
+    tagsError: string | null
     
     // 單個文章查詢函數
     usePostQuery: (id: string) => {
-        post: Post | undefined
+        post: Post | null
         isLoading: boolean
-        error: Error | null
+        error: string | null
     }
     
     // Actions
@@ -113,9 +112,13 @@ const PostContext = createContext<PostContextValue | undefined>(undefined)
 export function PostProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(postReducer, initialState)
     
-    // TanStack Query hooks
-    const { data: posts = [], isLoading: isPostsLoading, error: postsError } = useAllPosts()
-    const { data: tags = [], isLoading: isTagsLoading, error: tagsError } = useAllTags()
+    // Controller 數據狀態
+    const [posts, setPosts] = useState<Post[]>([])
+    const [tags, setTags] = useState<string[]>([])
+    const [isPostsLoading, setIsPostsLoading] = useState(false)
+    const [isTagsLoading, setIsTagsLoading] = useState(false)
+    const [postsError, setPostsError] = useState<string | null>(null)
+    const [tagsError, setTagsError] = useState<string | null>(null)
     
     // 使用 useRef 穩定 controller 引用
     const controllerRef = useRef<PostController | null>(null)
@@ -129,6 +132,20 @@ export function PostProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         const controller = controllerRef.current!
         controller.initialize()
+        
+        // 初始化數據載入
+        const loadInitialData = async () => {
+            try {
+                await Promise.all([
+                    controller.getAllPosts(),
+                    controller.getAllTags()
+                ])
+            } catch (error) {
+                console.error('Failed to load initial data:', error)
+            }
+        }
+        
+        loadInitialData()
         
         // 監聽 Controller 事件
         const handleCurrentPostChanged = (post: Post | null) => {
@@ -146,11 +163,47 @@ export function PostProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_VIEW_MODE', payload: mode })
         }
         
+        const handlePostsLoaded = (loadedPosts: Post[]) => {
+            setPosts(loadedPosts)
+            setIsPostsLoading(false)
+            setPostsError(null)
+        }
+        
+        const handleTagsLoaded = (loadedTags: string[]) => {
+            setTags(loadedTags)
+            setIsTagsLoading(false)
+            setTagsError(null)
+        }
+        
+        const handlePostsError = (error: string) => {
+            setPostsError(error)
+            setIsPostsLoading(false)
+        }
+        
+        const handleTagsError = (error: string) => {
+            setTagsError(error)
+            setIsTagsLoading(false)
+        }
+        
         controller.on('currentPostChanged', handleCurrentPostChanged)
         controller.on('readingHistoryUpdated', handleReadingHistoryUpdated)
         controller.on('viewModeChanged', handleViewModeChanged)
+        controller.on('postsLoaded', handlePostsLoaded)
+        controller.on('tagsLoaded', handleTagsLoaded)
+        controller.on('postsError', handlePostsError)
+        controller.on('tagsError', handleTagsError)
         
-        // 初始化閱讀歷史
+        // 初始化狀態
+        const loadingState = controller.getLoadingState()
+        const errorState = controller.getErrorState()
+        
+        setIsPostsLoading(loadingState.isLoadingPosts)
+        setIsTagsLoading(loadingState.isLoadingTags)
+        setPostsError(errorState.postsError)
+        setTagsError(errorState.tagsError)
+        setPosts(controller.getCachedPosts())
+        setTags(controller.getCachedTags())
+        
         dispatch({ 
             type: 'UPDATE_READING_HISTORY', 
             payload: controller.getReadingHistory() 
@@ -160,12 +213,12 @@ export function PostProvider({ children }: { children: ReactNode }) {
             controller.off('currentPostChanged', handleCurrentPostChanged)
             controller.off('readingHistoryUpdated', handleReadingHistoryUpdated)
             controller.off('viewModeChanged', handleViewModeChanged)
-            
-            // 🎯 重要修復：不銷毀單例 Controller
-            // 單例 Controller 應該在應用生命週期結束時才銷毀
-            // 這裡只移除事件監聽器即可，保持 Controller 可供其他組件使用
+            controller.off('postsLoaded', handlePostsLoaded)
+            controller.off('tagsLoaded', handleTagsLoaded)
+            controller.off('postsError', handlePostsError)
+            controller.off('tagsError', handleTagsError)
         }
-    }, []) // 移除 controller 依賴項
+    }, [])
     
     // 使用 useCallback 穩定函數引用
     const setSelectedTag = useCallback((tag: string | null) => {
@@ -199,7 +252,7 @@ export function PostProvider({ children }: { children: ReactNode }) {
         return []
     }, [posts])
     
-    const advancedSearch = useCallback((filters: Parameters<NonNullable<typeof controllerRef.current>['advancedSearch']>[1]) => {
+    const advancedSearch = useCallback((filters: Parameters<PostController['advancedSearch']>[1]) => {
         const controller = controllerRef.current
         if (controller && !controller.getState().isDestroyed) {
             return controller.advancedSearch(posts, filters)
@@ -207,34 +260,43 @@ export function PostProvider({ children }: { children: ReactNode }) {
         return []
     }, [posts])
     
-    // 簡單篩選邏輯
     const getFilteredPosts = useCallback(() => {
-        let filtered = posts
-        
-        // 標籤篩選
-        if (state.selectedTag) {
-            filtered = filtered.filter(post => 
-                post.tags?.includes(state.selectedTag!)
-            )
+        const controller = controllerRef.current
+        if (controller && !controller.getState().isDestroyed) {
+            return controller.advancedSearch(posts, {
+                searchTerm: state.searchTerm || undefined,
+                tags: state.selectedTag ? [state.selectedTag] : undefined,
+                sortBy: 'date'
+            })
         }
-        
-        // 搜索詞篩選
-        if (state.searchTerm) {
-            const term = state.searchTerm.toLowerCase()
-            filtered = filtered.filter(post =>
-                post.title.toLowerCase().includes(term) ||
-                post.author.toLowerCase().includes(term) ||
-                post.tags?.some(tag => tag.toLowerCase().includes(term))
-            )
-        }
-        
-        return filtered
-    }, [posts, state.selectedTag, state.searchTerm])
+        return []
+    }, [posts, state.searchTerm, state.selectedTag])
     
     // 單個文章查詢函數
     const usePostQuery = useCallback((id: string) => {
-        const { data: post, isLoading, error } = usePostDetail(id)
-        return { post, isLoading, error }
+        const controller = controllerRef.current
+        if (controller && !controller.getState().isDestroyed) {
+            const post = controller.getCachedPost(id)
+            const loadingState = controller.getLoadingState()
+            const errorState = controller.getErrorState()
+            
+            // 如果沒有緩存，嘗試載入
+            if (!post && !loadingState.isLoadingPost) {
+                controller.getPostById(id).catch(console.error)
+            }
+            
+            return {
+                post,
+                isLoading: loadingState.isLoadingPost,
+                error: errorState.postError
+            }
+        }
+        
+        return {
+            post: null,
+            isLoading: false,
+            error: null
+        }
     }, [])
     
     const value: PostContextValue = {
@@ -255,12 +317,13 @@ export function PostProvider({ children }: { children: ReactNode }) {
         getFilteredPosts
     }
     
-    return <PostContext.Provider value={value}>{children}</PostContext.Provider>
+    return (
+        <PostContext.Provider value={value}>
+            {children}
+        </PostContext.Provider>
+    )
 }
 
-/**
- * Hook
- */
 export function usePost() {
     const context = useContext(PostContext)
     if (context === undefined) {

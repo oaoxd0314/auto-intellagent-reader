@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { PostInteraction } from '../../../../../../types/post'
+import type { PostInteraction } from '../../types/post'
 
 interface CommentPopoverProps {
   interaction: PostInteraction | null

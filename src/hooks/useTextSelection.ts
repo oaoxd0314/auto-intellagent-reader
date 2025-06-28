@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react'
 import { useTextSelectionContext } from '../contexts/TextSelectionContext'
 import { TextSelectionService } from '../services/TextSelectionService'
-import type { TextPosition } from '../../../../../types/post'
+import type { TextPosition } from '../types/post'
 
 // 文字選擇配置
 type TextSelectionConfig = {

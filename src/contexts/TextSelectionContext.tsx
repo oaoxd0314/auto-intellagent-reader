@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import type { TextPosition } from '../../../../../types/post'
+import type { TextPosition } from '../types/post'
 
 // 文字選擇狀態
 type TextSelectionState = {

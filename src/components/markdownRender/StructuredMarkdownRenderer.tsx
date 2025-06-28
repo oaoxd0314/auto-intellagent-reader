@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { Post, PostInteraction } from '../../../../../../types/post'
+import type { Post, PostInteraction } from '../../types/post'
 import { useTextMarking } from '../../hooks/useTextMarking'
 import { InteractionMenu } from './InteractionMenu'
 
@@ -31,12 +31,10 @@ export function StructuredMarkdownRenderer({
     interactions,
     contentRef,
     onCommentClick: (interaction) => {
-      // 直接使用 interaction，不需要複雜的元素查找
-      onCommentTarget(null as any, interaction) // 傳 null 因為新 API 不需要 element
+      onCommentTarget(null as any, interaction)
     },
     onHighlightClick: (interaction) => {
-      // 直接使用 interaction，不需要複雜的元素查找
-      onHighlightTarget(null as any, interaction) // 傳 null 因為新 API 不需要 element
+      onHighlightTarget(null as any, interaction)
     }
   })
 

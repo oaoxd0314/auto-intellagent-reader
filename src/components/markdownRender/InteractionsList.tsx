@@ -1,4 +1,4 @@
-import type { PostInteraction } from '../../../../../../types/post'
+import type { PostInteraction } from '../../types/post'
 
 export interface ReplyListProps {
   interactions: PostInteraction[] // 現在這裡只會是 reply 類型的互動

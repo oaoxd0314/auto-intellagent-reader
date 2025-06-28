@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { PostInteraction } from '../../../../../types/post'
+import type { PostInteraction } from '../types/post'
 
 // 簡單的 popover 狀態
 type PopoverState = {

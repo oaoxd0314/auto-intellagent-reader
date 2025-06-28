@@ -1,4 +1,4 @@
-import type { TextPosition } from '../../../../../types/post'
+import type { TextPosition } from '../types/post'
 
 // 選擇配置
 type SelectionConfig = {
