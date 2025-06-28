@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, RefObject } from 'react'
 
 export interface SelectionData {
     selectedText: string
@@ -10,7 +10,7 @@ export interface SelectionData {
 /**
  * 文字選擇 Hook - 簡化版，依賴原生 selection 邏輯
  */
-export function useSelectionSection() {
+export function useSelectionSection(containerRef: RefObject<HTMLDivElement>) {
     const [selectionData, setSelectionData] = useState<SelectionData>({
         selectedText: '',
         selectionPosition: null,
@@ -42,19 +42,26 @@ export function useSelectionSection() {
         return null
     }, [])
 
-    // 計算選擇位置（用於 popover 定位）
+    // 計算選擇位置（用於 popover 定位）- absolute positioning
     const getSelectionPosition = useCallback((range: Range): { x: number, y: number } => {
-        const rect = range.getBoundingClientRect()
+        if (!containerRef?.current) {
+            console.warn('useSelectionSection: containerRef is required for positioning')
+            return { x: 0, y: 0 }
+        }
 
-        // 使用現代 API，不用已棄用的 pageYOffset
-        const scrollTop = window.scrollY
-        const scrollLeft = window.scrollX
+        const collapsedRange = document.createRange()
+        collapsedRange.setStart(range.startContainer, range.startOffset)
+        collapsedRange.setEnd(range.startContainer, range.startOffset)
+
+        const rect = collapsedRange.getBoundingClientRect()
+        const containerRect = containerRef.current.getBoundingClientRect()
+        const offsetY = 8
 
         return {
-            x: rect.left + scrollLeft + rect.width / 2,  // 選擇範圍的水平中心
-            y: rect.top + scrollTop + rect.height / 2    // 選擇範圍的垂直中心
+            x: rect.left - containerRect.left,
+            y: rect.top - containerRect.top - offsetY,
         }
-    }, [])
+    }, [containerRef])
 
     // 處理文字選擇
     const handleSelection = useCallback(() => {

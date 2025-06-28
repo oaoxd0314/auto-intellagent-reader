@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, RefObject } from 'react'
 import type { Post } from '../types/post'
 import { useSelectionSection } from '../hooks/useSelectionSection'
 import { useMarkSection } from '../hooks/useMarkSection'
@@ -26,9 +26,10 @@ export function StructuredMarkdownRenderer({
   onHighlightAdded
 }: StructuredMarkdownRendererProps) {
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // 使用 selection 和 highlight hooks
-  const selection = useSelectionSection()
+  const selection = useSelectionSection(containerRef as RefObject<HTMLDivElement>)
   const markSection = useMarkSection(post.id)
 
   // 處理高亮操作
@@ -176,7 +177,7 @@ export function StructuredMarkdownRenderer({
   }, [post.id, markSection.highlights, enableSelection, enableHighlight])
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       {/* 文章內容 */}
       <div 
         ref={contentRef}

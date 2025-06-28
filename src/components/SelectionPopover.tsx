@@ -36,21 +36,20 @@ export function SelectionPopover({
     ? `${selectedText.slice(0, maxTextLength)}...` 
     : selectedText
 
-  // 計算安全的位置，避免超出視窗範圍，並考慮 navbar 高度
+  // 簡化定位邏輯 - 直接使用傳入的 position（已經是 container 相對座標）
   const popoverWidth = 200
   const popoverHeight = 80
-  const navbarHeight = 68 // 從 CSS 變數 --navbar-height 獲取
   
-  const safePosition = {
-    x: Math.max(popoverWidth / 2, Math.min(position.x, document.documentElement.scrollWidth - popoverWidth / 2)),
-    y: Math.max(navbarHeight + popoverHeight + 10, position.y) // 確保不會被 navbar 遮擋，加 10px 緩衝
+  const finalPosition = {
+    left: position.x - popoverWidth / 2,     // 水平居中對齊選取點
+    top: position.y - popoverHeight - 5,     // 在選取點上方 5px
   }
 
   return (
     <>
-      {/* 背景遮罩 */}
+      {/* 背景遮罩 - 改為 absolute，覆蓋整個 container */}
       <div 
-        className="fixed inset-0 z-40"
+        className="absolute inset-0 z-40"
         onClick={onClose}
         data-selection-popover="backdrop"
       />
@@ -59,8 +58,8 @@ export function SelectionPopover({
       <Card
         className="absolute z-50 p-2 shadow-lg border-gray-200 bg-white"
         style={{
-          left: safePosition.x - popoverWidth / 2,  // 水平居中對齊
-          top: safePosition.y - popoverHeight - 10, // 在選擇範圍上方，留 10px 間距
+          left: finalPosition.left,
+          top: finalPosition.top,
           minWidth: `${popoverWidth}px`
         }}
         data-selection-popover="content"
