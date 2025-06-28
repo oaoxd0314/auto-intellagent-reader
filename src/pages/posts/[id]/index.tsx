@@ -115,6 +115,14 @@ function PostDetailContent() {
         <div>
           <StructuredMarkdownRenderer 
             post={post}
+            enableSelection={true}
+            enableHighlight={true}
+            onTextSelect={(selectedText, sectionId) => {
+              console.log('文字選擇:', { selectedText, sectionId })
+            }}
+            onHighlightAdded={(sectionId) => {
+              console.log('高亮已添加:', sectionId)
+            }}
           />
         </div>
       </div>
