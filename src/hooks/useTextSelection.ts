@@ -9,6 +9,7 @@ type TextSelectionConfig = {
     readonly onComment?: (selectedText: string, position: TextPosition) => void
     readonly excludeSelectors?: string[]
     readonly debounceMs?: number
+    readonly showPopover?: (data: { onMark: () => void; onComment: () => void }) => void
 }
 
 // Hook 返回介面
@@ -23,7 +24,7 @@ type UseTextSelectionReturn = {
  * 遵循架構原則：Context 管理狀態，Service 處理 DOM 操作
  */
 export function useTextSelection(config?: TextSelectionConfig): UseTextSelectionReturn {
-    const { onMark, onComment, excludeSelectors = [], debounceMs = 100 } = config || {}
+    const { onMark, onComment, excludeSelectors = [], debounceMs = 100, showPopover } = config || {}
 
     const contentRef = useRef<HTMLDivElement | null>(null)
     const selectionContext = useTextSelectionContext()
@@ -52,12 +53,6 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
             zIndex: 40
         })
 
-        // 計算選單位置
-        const menuPosition = TextSelectionService.calculateMenuPosition(
-            selectionResult.rects,
-            contentRef.current
-        )
-
         // 更新 Context 狀態
         selectionContext.setSelection({
             selectedText: selectionResult.text,
@@ -67,12 +62,25 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
             selectedElement: overlayElements[0] || null
         })
 
-        if (menuPosition) {
-            selectionContext.showMenu(menuPosition)
+        // 使用新的 popover 系統顯示選單
+        if (showPopover) {
+            showPopover({
+                onMark: handleMark,
+                onComment: handleComment
+            })
+        } else {
+            // fallback 到舊的 context 選單系統
+            const menuPosition = TextSelectionService.calculateMenuPosition(
+                selectionResult.rects,
+                contentRef.current
+            )
+            if (menuPosition) {
+                selectionContext.showMenu(menuPosition)
+            }
         }
 
         // 不要立即清除原生選擇，讓用戶可以繼續選擇新的範圍
-    }, [selectionContext])
+    }, [selectionContext, showPopover])
 
     /**
      * 處理標記操作
@@ -131,7 +139,7 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
         }
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape' && selectionContext.isMenuVisible) {
+            if (event.key === 'Escape' && (selectionContext.isMenuVisible || selectionContext.selectedText)) {
                 clearSelection()
             }
         }
@@ -148,7 +156,7 @@ export function useTextSelection(config?: TextSelectionConfig): UseTextSelection
             const isOutside = TextSelectionService.isClickOutside(
                 event,
                 contentRef.current,
-                [...excludeSelectors, '.interaction-menu', '.custom-selection-overlay']
+                [...excludeSelectors, '.interaction-menu', '.custom-selection-overlay', '.text-selection-popover']
             )
 
             if (isOutside && (selectionContext.selectedText || selectionContext.isMenuVisible)) {

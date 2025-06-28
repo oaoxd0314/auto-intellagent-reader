@@ -1,15 +1,20 @@
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { useState } from 'react'
-import { usePostDetail, usePostInteractions } from '../../../hooks/usePostPage'
+import { usePostDetail } from '../../../hooks/usePostPage'
 import type { PostInteraction } from '../../../types/post'
 import { StructuredMarkdownRenderer } from '../../../components/markdownRender/StructuredMarkdownRenderer'
 import { ReplyList } from '../../../components/markdownRender/InteractionsList'
 import { InteractionDialogs } from '../../../components/markdownRender/InteractionDialogs'
-import { CommentPopover } from '../../../components/markdownRender/CommentPopover'
-import { HighlightPopover } from '../../../components/markdownRender/HighlightPopover'
+import { 
+  TextSelectionMenu, 
+  MarkActionsMenu, 
+  CommentActionsMenu, 
+  CommentView 
+} from '../../../components/markdownRender/InteractionMenu'
 import { usePopover } from '../../../hooks/usePopover'
 import { TextSelectionProvider } from '../../../contexts/TextSelectionContext'
 import { useTextSelection } from '../../../hooks/useTextSelection'
+import { useTextMarking } from '../../../hooks/useTextMarking'
 import { useTextSelectionContext } from '../../../contexts/TextSelectionContext'
 
 function PostDetailContent() {
@@ -26,11 +31,9 @@ function PostDetailContent() {
     
     // UI 狀態
     isLoading,
-    isRefreshing,
     error,
     
     // 操作方法
-    refreshPost,
     clearError,
     addMark,
     addComment,
@@ -71,19 +74,24 @@ function PostDetailContent() {
 
   // 統一的 popover 管理
   const {
-    commentState,
-    highlightState,
-    showCommentPopover,
-    showHighlightPopover,
+    textSelectionMenuState,
+    markActionsState,
+    commentActionsState,
+    commentViewState,
+    showTextSelectionMenu,
+    showMarkActions,
+    showCommentActions,
+    showCommentView,
     closePopover
   } = usePopover()
   
-  // 文字選擇狀態 (目前未使用，但保留 context 連接)
-  useTextSelectionContext()
+  // 文字選擇狀態
+  const selectionContext = useTextSelectionContext()
   
   // 處理標記操作
   const handleMarkAction = (selectedText: string, selectedPosition: any) => {
     addMark(selectedText, selectedPosition)
+    closePopover()
   }
 
   // 處理評論操作
@@ -92,13 +100,26 @@ function PostDetailContent() {
     // 保存選擇的文字和位置
     setSavedSelectedText(selectedText)
     setSavedSelectedPosition(selectedPosition)
+    closePopover()
     openCommentDialog()
   }
 
   // 文字選擇管理
   const { contentRef, handleMark: handleMarkClick, handleComment: handleCommentClick } = useTextSelection({
     onMark: handleMarkAction,
-    onComment: handleCommentAction
+    onComment: handleCommentAction,
+    showPopover: (data) => {
+      showTextSelectionMenu(data)
+    }
+  })
+
+  // 文字標記管理
+  useTextMarking({
+    interactions,
+    contentRef,
+    onHighlightClick: showMarkActions,
+    onCommentClick: showCommentActions,
+    onCommentView: showCommentView
   })
 
   // 提交評論
@@ -167,15 +188,6 @@ function PostDetailContent() {
     )
   }
 
-  // 處理 popover 目標設置
-  const handleCommentTarget = (_element: HTMLElement | null, interaction: PostInteraction) => {
-    showCommentPopover(interaction)
-  }
-
-  const handleHighlightTarget = (_element: HTMLElement | null, interaction: PostInteraction) => {
-    showHighlightPopover(interaction)
-  }
-
   return (
     <div className="container mx-auto px-4 py-8 relative">
       {/* 返回按鈕和操作欄 */}
@@ -224,8 +236,8 @@ function PostDetailContent() {
           <StructuredMarkdownRenderer 
             post={post}
             interactions={interactions}
-            onCommentTarget={handleCommentTarget}
-            onHighlightTarget={handleHighlightTarget}
+            onCommentTarget={() => {}} // 不再需要
+            onHighlightTarget={() => {}} // 不再需要
             onMark={handleMarkClick}
             onComment={handleCommentClick}
           />
@@ -274,25 +286,37 @@ function PostDetailContent() {
         </div>
       )}
       
-      {/* Popovers */}
-      {commentState.isActive && commentState.data && (
-        <CommentPopover
-          interaction={commentState.data.interaction}
-          position={commentState.data.position}
-          show={true}
-          onClose={closePopover}
-        />
-      )}
-      
-      {highlightState.isActive && highlightState.data && (
-        <HighlightPopover
-          interaction={highlightState.data.interaction}
-          position={highlightState.data.position}
-          show={true}
-          onClose={closePopover}
-          onRemove={removeInteraction}
-        />
-      )}
+      {/* 新的 Popover 系統 */}
+      <TextSelectionMenu
+        show={textSelectionMenuState.isActive}
+        position={textSelectionMenuState.data?.position}
+        onMark={textSelectionMenuState.data?.data?.onMark || (() => {})}
+        onComment={textSelectionMenuState.data?.data?.onComment || (() => {})}
+        onClose={closePopover}
+      />
+
+      <MarkActionsMenu
+        show={markActionsState.isActive}
+        position={markActionsState.data?.position}
+        interaction={markActionsState.data?.interaction}
+        onRemove={removeInteraction}
+        onClose={closePopover}
+      />
+
+      <CommentActionsMenu
+        show={commentActionsState.isActive}
+        position={commentActionsState.data?.position}
+        interaction={commentActionsState.data?.interaction}
+        onRemove={removeInteraction}
+        onClose={closePopover}
+      />
+
+      <CommentView
+        show={commentViewState.isActive}
+        position={commentViewState.data?.position}
+        interaction={commentViewState.data?.interaction}
+        onClose={closePopover}
+      />
       
       {/* 對話框 */}
       <InteractionDialogs
@@ -302,7 +326,6 @@ function PostDetailContent() {
         onCommentTextChange={setCommentText}
         onCommentSubmit={handleCommentSubmit}
         onCommentCancel={closeCommentDialog}
-        
         showReplyDialog={showReplyDialog}
         replyText={replyText}
         onReplyTextChange={setReplyText}

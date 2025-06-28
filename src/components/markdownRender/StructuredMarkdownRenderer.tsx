@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Post, PostInteraction } from '../../types/post'
 import { useTextMarking } from '../../hooks/useTextMarking'
-import { InteractionMenu } from './InteractionMenu'
 
 interface StructuredMarkdownRendererProps {
   post: Post
@@ -76,12 +75,6 @@ export function StructuredMarkdownRenderer({
           </div>
         )}
       </div>
-
-      {/* 互動選單 - 由 TextSelectionContext 管理 */}
-      <InteractionMenu
-        onMark={onMark}
-        onComment={onComment}
-      />
     </div>
   )
 } 

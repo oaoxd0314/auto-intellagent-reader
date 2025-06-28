@@ -6,6 +6,7 @@ type UseTextMarkingProps = {
     contentRef: RefObject<HTMLElement | null>
     onCommentClick?: (interaction: PostInteraction) => void
     onHighlightClick?: (interaction: PostInteraction) => void
+    onCommentView?: (interaction: PostInteraction) => void
 }
 
 /**
@@ -15,7 +16,8 @@ export function useTextMarking({
     interactions,
     contentRef,
     onCommentClick,
-    onHighlightClick
+    onHighlightClick,
+    onCommentView
 }: UseTextMarkingProps) {
 
     useEffect(() => {
@@ -88,14 +90,30 @@ export function useTextMarking({
                         markElement.style.cursor = 'pointer'
 
                         if (interaction.type === 'mark') {
-                            markElement.className = 'bg-yellow-200 hover:bg-yellow-300 transition-colors'
+                            markElement.className = 'bg-yellow-200 hover:bg-yellow-300 transition-colors text-highlight'
                             markElement.addEventListener('click', () => {
                                 onHighlightClick?.(interaction)
                             })
                         } else if (interaction.type === 'comment') {
-                            markElement.className = 'bg-blue-200 hover:bg-blue-300 transition-colors border-b-2 border-blue-400'
-                            markElement.addEventListener('click', () => {
+                            markElement.className = 'bg-blue-200 hover:bg-blue-300 transition-colors border-b-2 border-blue-400 text-comment relative'
+
+                            // 添加留言 icon
+                            const commentIcon = document.createElement('span')
+                            commentIcon.className = 'absolute -top-1 -right-1 text-xs text-blue-600'
+                            commentIcon.textContent = '💬'
+                            commentIcon.style.fontSize = '10px'
+                            markElement.appendChild(commentIcon)
+
+                            // 點擊標記文字顯示操作選單
+                            markElement.addEventListener('click', (e) => {
+                                e.stopPropagation()
                                 onCommentClick?.(interaction)
+                            })
+
+                            // 點擊 icon 顯示留言內容
+                            commentIcon.addEventListener('click', (e) => {
+                                e.stopPropagation()
+                                onCommentView?.(interaction)
                             })
                         }
 
