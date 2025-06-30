@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, RefObject } from 'react'
 import type { Post } from '../types/post'
 import { useSelectionSection } from '../hooks/useSelectionSection'
 import { useMarkSection } from '../hooks/useMarkSection'
+import { useCommentSection } from '../hooks/useCommentSection'
 import { SelectionPopover } from './SelectionPopover'
 
 interface StructuredMarkdownRendererProps {
@@ -28,9 +29,10 @@ export function StructuredMarkdownRenderer({
   const contentRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 使用 selection 和 highlight hooks
+  // 使用 selection、highlight 和 comment hooks
   const selection = useSelectionSection(containerRef as RefObject<HTMLDivElement>)
   const markSection = useMarkSection(post.id)
+  const commentSection = useCommentSection(post.id, containerRef)
 
   // 處理高亮操作
   const handleHighlight = useCallback(async () => {
@@ -57,17 +59,25 @@ export function StructuredMarkdownRenderer({
     }
   }, [selection, markSection, onHighlightAdded, onTextSelect])
 
-  // 處理評論操作（暫時只是 placeholder）
-  const handleComment = useCallback(() => {
+  // 處理評論操作
+  const handleComment = useCallback(async (content: string) => {
     if (!selection.isValidSelection || !selection.sectionId || !selection.selectedText) {
       return
     }
 
-    // TODO: 實作評論功能
-    
-    onTextSelect?.(selection.selectedText, selection.sectionId)
-    selection.clearSelection()
-  }, [selection, onTextSelect])
+    try {
+      await commentSection.addComment(selection.sectionId, selection.selectedText, content)
+      
+      // 通知父組件
+      onTextSelect?.(selection.selectedText, selection.sectionId)
+      
+      // 清除選擇
+      selection.clearSelection()
+    } catch (error) {
+      // 靜默處理錯誤
+      console.error('添加評論失敗:', error)
+    }
+  }, [selection, commentSection, onTextSelect])
 
   // 為段落添加 ID 和精確高亮
   useEffect(() => {
@@ -98,12 +108,15 @@ export function StructuredMarkdownRenderer({
         if (enableSelection) {
           element.setAttribute('data-selection-trigger', 'true')
         }
+
+
       })
 
-      // 處理精確的文字高亮
+      // 處理精確的文字高亮和評論高亮
       if (enableHighlight) {
         applyTextHighlights()
       }
+      applyCommentHighlights()
     }
 
     // 應用精確的文字高亮
@@ -123,13 +136,35 @@ export function StructuredMarkdownRenderer({
       markSection.highlights.forEach(highlight => {
         const sectionElement = contentRef.current?.querySelector(`#${highlight.position?.sectionId}`)
         if (sectionElement && highlight.selectedText) {
-          highlightTextInElement(sectionElement, highlight.selectedText, highlight.id)
+          highlightTextInElement(sectionElement, highlight.selectedText, highlight.id, 'highlight')
+        }
+      })
+    }
+
+    // 應用評論文字高亮
+    const applyCommentHighlights = () => {
+      if (!contentRef.current) return
+
+      // 清除所有現有的評論高亮標記
+      contentRef.current.querySelectorAll('mark[data-comment-id]').forEach(mark => {
+        const parent = mark.parentNode
+        if (parent) {
+          parent.replaceChild(document.createTextNode(mark.textContent || ''), mark)
+          parent.normalize() // 合併相鄰的文字節點
+        }
+      })
+
+      // 應用評論高亮
+      commentSection.allComments.forEach(comment => {
+        const sectionElement = contentRef.current?.querySelector(`#${comment.position?.sectionId}`)
+        if (sectionElement && comment.selectedText) {
+          highlightTextInElement(sectionElement, comment.selectedText, comment.id, 'comment')
         }
       })
     }
 
     // 在指定元素中高亮特定文字
-    const highlightTextInElement = (element: Element, searchText: string, highlightId: string) => {
+    const highlightTextInElement = (element: Element, searchText: string, id: string, type: 'highlight' | 'comment' = 'highlight') => {
       const walker = document.createTreeWalker(
         element,
         NodeFilter.SHOW_TEXT,
@@ -158,8 +193,18 @@ export function StructuredMarkdownRenderer({
           }
 
           const mark = document.createElement('mark')
-          mark.className = 'bg-yellow-200 px-1 rounded'
-          mark.setAttribute('data-highlight-id', highlightId)
+          
+          // 根據類型設置不同的樣式和屬性
+          if (type === 'highlight') {
+            mark.className = 'bg-yellow-200 px-1 rounded'
+            mark.setAttribute('data-highlight-id', id)
+          } else if (type === 'comment') {
+            mark.className = 'bg-blue-100 border-b-2 border-blue-300 px-1 rounded cursor-pointer hover:bg-blue-200'
+            mark.setAttribute('data-comment-id', id)
+            mark.setAttribute('data-comment-trigger', 'true')
+            mark.title = '點擊查看評論'
+          }
+          
           mark.textContent = highlightText
           fragment.appendChild(mark)
 
@@ -174,7 +219,18 @@ export function StructuredMarkdownRenderer({
     
     const timer = setTimeout(addIdsAndHighlights, 100)
     return () => clearTimeout(timer)
-  }, [post.id, markSection.highlights, enableSelection, enableHighlight])
+  }, [post.id, markSection.highlights, commentSection.allComments, enableSelection, enableHighlight])
+
+
+
+  // 添加段落點擊事件監聽器
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    container.addEventListener('click', commentSection.handleCommentClick)
+    return () => container.removeEventListener('click', commentSection.handleCommentClick)
+  }, [commentSection.handleCommentClick])
 
   return (
     <div className="relative" ref={containerRef}>
@@ -204,7 +260,7 @@ export function StructuredMarkdownRenderer({
           onComment={handleComment}
           onClose={selection.clearSelection}
           isHighlighting={markSection.isSubmitting}
-          isCommenting={false} // TODO: 實作評論功能後更新
+          isCommenting={commentSection.isSubmitting}
         />
       )}
 
@@ -214,6 +270,58 @@ export function StructuredMarkdownRenderer({
           {markSection.highlightStats.total} 個高亮片段
         </div>
       )}
+
+      {/* 評論 Popover */}
+      {commentSection.popover.isVisible && commentSection.popover.position && commentSection.popover.comments.length > 0 && (
+        <>
+          {/* 背景遮罩 */}
+          <div 
+            className="absolute inset-0 z-40"
+            onClick={commentSection.hideCommentPopover}
+          />
+          
+          {/* 簡化的評論顯示 */}
+          <div
+            className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm"
+            style={{
+              left: Math.max(10, commentSection.popover.position.x - 160), // 水平居中，但不超出邊界
+              top: commentSection.popover.position.y - 10   // 稍微上移
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-medium text-gray-900 mb-3">
+              評論 ({commentSection.popover.comments.length})
+            </div>
+            
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {commentSection.popover.comments.map((comment) => (
+                <div key={comment.id} className="border-b border-gray-100 pb-2 last:border-b-0 last:pb-0">
+                  <div className="text-sm text-gray-900 mb-1">{comment.content}</div>
+                  
+                  {comment.selectedText && (
+                    <div className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 mb-1 italic">
+                      "{comment.selectedText.length > 40 ? comment.selectedText.slice(0, 40) + '...' : comment.selectedText}"
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-400">
+                      {new Date(comment.timestamp).toLocaleString('zh-TW')}
+                    </div>
+                    <button
+                      onClick={() => commentSection.deleteComment(comment.id)}
+                      disabled={commentSection.deletingIds.has(comment.id)}
+                      className="text-xs text-red-500 hover:text-red-700 disabled:text-red-300 disabled:cursor-not-allowed"
+                    >
+                      {commentSection.deletingIds.has(comment.id) ? '刪除中...' : '刪除'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
-} 
+}
