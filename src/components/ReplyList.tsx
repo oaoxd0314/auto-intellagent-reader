@@ -72,15 +72,6 @@ function ReplyItem({
   reply: PostInteraction
   onDelete: (replyId: string) => Promise<void>
 }) {
-  const handleDelete = async () => {
-    if (window.confirm('確定要刪除這個回覆嗎？')) {
-      try {
-        await onDelete(reply.id)
-      } catch (error) {
-        console.error('刪除回覆失敗:', error)
-      }
-    }
-  }
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp)
@@ -125,7 +116,7 @@ function ReplyItem({
         
         {/* 刪除按鈕 */}
         <button
-          onClick={handleDelete}
+          onClick={() => onDelete(reply.id)}
           className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all duration-200"
           title="刪除回覆"
         >

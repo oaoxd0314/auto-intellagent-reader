@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useReplyPost } from '../hooks/useReplyPost'
 import { ReplyForm } from './ReplyForm'
 import { ReplyList } from './ReplyList'
@@ -7,25 +8,24 @@ type PostReplySectionProps = {
 }
 
 /**
- * 文章回覆區域組件
- * 整合回覆表單和回覆列表，使用 useReplyPost hook
+ * 文章回覆區域組件 - 簡化版本
+ * 純組件，只保留基本功能
  */
-export function PostReplySection({ postId }: PostReplySectionProps) {
+export const PostReplySection = memo(function PostReplySection({ postId }: PostReplySectionProps) {
   const {
     // 數據
     replies,
     replyStats,
     
     // 狀態
-    isSubmitting,
+    isPending,
     submitError,
     
     // 操作方法
-    addReply,
+    handleSubmit,
     deleteReply,
     
     // 工具方法
-    validateReplyContent,
     canSubmit,
     clearSubmitError
   } = useReplyPost(postId)
@@ -48,11 +48,10 @@ export function PostReplySection({ postId }: PostReplySectionProps) {
         {/* 回覆表單 */}
         <div className="mt-4">
           <ReplyForm
-            onSubmit={addReply}
-            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit}
+            isPending={isPending}
             submitError={submitError}
             onClearError={clearSubmitError}
-            validateContent={validateReplyContent}
             canSubmit={canSubmit}
           />
         </div>
@@ -63,9 +62,9 @@ export function PostReplySection({ postId }: PostReplySectionProps) {
         <ReplyList
           replies={replies}
           onDeleteReply={deleteReply}
-          isLoading={false} // 由於我們使用 Context，載入狀態在 Context 中管理
+          isLoading={false}
         />
       </div>
     </div>
   )
-} 
+}) 
