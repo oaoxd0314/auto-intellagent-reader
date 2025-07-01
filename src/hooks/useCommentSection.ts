@@ -1,7 +1,15 @@
 import { useMemo, useState, useCallback, RefObject, useEffect } from 'react'
 import { useInteraction } from '../contexts/InteractionContext'
 import { InteractionController } from '../controllers/InteractionController'
-import type { PostInteraction } from '../types/post'
+import type { PostInteraction } from '@/types/post'
+
+
+export type CommentPopover = {
+    isVisible: boolean
+    sectionId: string | null
+    position: { x: number, y: number } | null
+    comments: PostInteraction[]
+}
 
 /**
  * Comment Section Hook - 管理段落評論功能
@@ -14,12 +22,7 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
     const controller = InteractionController.getInstance()
 
     // CommentPopover 狀態
-    const [popover, setPopover] = useState<{
-        isVisible: boolean
-        sectionId: string | null
-        position: { x: number, y: number } | null
-        comments: PostInteraction[]
-    }>({
+    const [popover, setPopover] = useState<CommentPopover>({
         isVisible: false,
         sectionId: null,
         position: null,
@@ -76,7 +79,10 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
 
     // 刪除評論
     const deleteComment = useCallback(async (commentId: string) => {
+
         if (deletingIds.has(commentId)) return // 防止重複刪除
+
+        console.log('deleteComment', commentId)
 
         setDeletingIds(prev => new Set(prev).add(commentId))
 
@@ -132,13 +138,14 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
         const sectionComments = getCommentsBySectionId(sectionId)
         if (sectionComments.length === 0) return
 
-        // 計算 Popover 位置
+        // 計算 Popover 位置 - 相對於 container，與 useSelectionSection 一致
         const rect = commentElement.getBoundingClientRect()
         const containerRect = containerRef.current.getBoundingClientRect()
+        const offsetY = 8
 
         const position = {
-            x: rect.left - containerRect.left + rect.width / 2,
-            y: rect.top - containerRect.top
+            x: rect.left - containerRect.left + rect.width / 2,  // 元素中心點相對於 container 的 X 座標
+            y: rect.top - containerRect.top - offsetY            // 元素頂部相對於 container 的 Y 座標
         }
 
         setPopover({
