@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { routes } from './router/routes'
 import { PostProvider } from './contexts/PostContext'
 import { BehaviorProvider } from './contexts/BehaviorContext'
+import { InteractionProvider } from './contexts/InteractionContext'
 import { ProviderComposer } from './components/ProviderComposer'
 import Navigation from './components/Navigation'
 import './index.css'
@@ -10,6 +11,7 @@ import './index.css'
 // Provider 配置 - 按依賴順序排列
 const providers = [
   PostProvider,           // 基礎數據層
+  InteractionProvider,    // 互動功能管理
   BehaviorProvider,       // 行為分析層
 ]
 
