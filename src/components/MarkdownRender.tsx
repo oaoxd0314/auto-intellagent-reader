@@ -2,8 +2,10 @@ import { useEffect, useRef, RefObject, useState } from 'react'
 import type { Post, PostInteraction } from '@/types/post'
 import { useSelectionSection } from '@/hooks/useSelectionSection'
 import { useMarkSection } from '@/hooks/useMarkSection'
-import { useCommentSection, type CommentPopover } from '@/hooks/useCommentSection'
+import { useCommentSection } from '@/hooks/useCommentSection'
 import { SelectionPopover } from '@/components/SelectionPopover'
+import { CommentPopover } from '@/components/CommentPopover'
+import { HighlightPopover } from '@/components/HighlightPopover'
 
 interface StructuredMarkdownRendererProps {
   post: Post
@@ -13,122 +15,6 @@ interface StructuredMarkdownRendererProps {
   // 事件回調
   onTextSelect?: (selectedText: string, sectionId: string) => void
   onHighlightAdded?: (highlightId: string) => void
-}
-
-
-interface CommentPopoverProps {
-  isVisible: boolean
-  position: { x: number, y: number } | null
-  comments: PostInteraction[]
-  onClose: () => void
-  onDeleteComment: (commentId: string) => Promise<void>
-  isDeleting?: boolean
-}
-
-/**
- * 評論 Popover - 顯示段落評論並支援刪除操作
- */
-function CommentPopover({ 
-  isVisible, 
-  position, 
-  comments, 
-  onClose, 
-  onDeleteComment, 
-  isDeleting = false 
-}: CommentPopoverProps) {
-  const popoverRef = useRef<HTMLDivElement>(null)
-  const [realHeight, setRealHeight] = useState<number>(0)
-
-  // 在每次渲染後獲取真實高度
-  useEffect(() => {
-    if (isVisible && popoverRef.current) {
-      const height = popoverRef.current.offsetHeight
-      setRealHeight(height)
-    }
-  }, [isVisible, comments.length])
-
-  if (!isVisible || !position || comments.length === 0) {
-    return null
-  }
-
-  const POPOVER_WIDTH = 320
-  
-  const finalPosition = {
-    left: position.x - POPOVER_WIDTH / 2,     // 水平居中對齊選取點
-    top: position.y - realHeight - 5,         // 使用真實高度在選取點上方 5px
-  }
-
-  return (
-    <>
-      {/* 背景遮罩 */}
-      <div 
-        className="absolute inset-0 z-40"
-        onClick={onClose}
-        data-comment-popover="backdrop"
-      />
-      
-      {/* Popover 內容 */}
-      <div
-        ref={popoverRef}
-        className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4"
-        style={{
-          left: finalPosition.left,
-          top: finalPosition.top,
-          width: `${POPOVER_WIDTH}px`
-        }}
-        data-comment-popover="content"
-        onClick={(e) => e.stopPropagation()} // 防止點擊 Popover 內容時關閉
-      >
-        <div className="text-sm font-medium text-gray-900 mb-3">
-          評論 ({comments.length})
-        </div>
-        
-        <div className="space-y-3 max-h-60 overflow-y-auto">
-          {comments.map((comment) => (
-            <div key={comment.id} className="border-b border-gray-100 pb-2 last:border-b-0 last:pb-0">
-              {/* 評論內容 - 截斷顯示，hover 顯示完整內容 */}
-              <div 
-                className="text-sm text-gray-900 mb-1 cursor-pointer transition-all duration-200 truncate hover:whitespace-normal hover:overflow-visible"
-                title={comment.content}
-              >
-                {comment.content}
-              </div>
-              
-              {comment.selectedText && (
-                <div className="text-xs text-gray-500 bg-gray-50 rounded px-2 py-1 mb-1 italic truncate hover:whitespace-normal hover:overflow-visible transition-all duration-200">
-                  "{comment.selectedText}"
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-400">
-                  {new Date(comment.timestamp).toLocaleString('zh-TW')}
-                </div>
-                <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    await onDeleteComment(comment.id)
-                  }}
-                  disabled={isDeleting}
-                  className="px-2 py-1 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded disabled:text-red-300 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                >
-                  {isDeleting ? '刪除中...' : '刪除'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* 小箭頭指向選擇區域 */}
-        <div 
-          className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-white"
-          style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))' }}
-        />
-      </div>
-    </>
-  )
 }
 
 
@@ -164,6 +50,17 @@ export function StructuredMarkdownRenderer({
     handleCommentClick,
     popover,
   } = useCommentSection(post.id, containerRef)
+
+  // 高亮 Popover 狀態
+  const [highlightPopover, setHighlightPopover] = useState<{
+    isVisible: boolean
+    position: { x: number, y: number } | null
+    highlight: PostInteraction | null
+  }>({
+    isVisible: false,
+    position: null,
+    highlight: null
+  })
 
   // 處理高亮操作 - React 19 Compiler 自動優化
   const handleHighlight = async () => {
@@ -201,6 +98,63 @@ export function StructuredMarkdownRenderer({
     } catch (error) {
       // 靜默處理錯誤
       console.error('添加評論失敗:', error)
+    }
+  }
+
+  // 顯示高亮 Popover
+  const showHighlightPopover = (highlightElement: HTMLElement, highlight: PostInteraction) => {
+    if (!containerRef?.current) return
+
+    // 計算 Popover 位置 - 相對於 container，與其他 popover 一致
+    const rect = highlightElement.getBoundingClientRect()
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const offsetY = 8
+
+    const position = {
+      x: rect.left - containerRect.left + rect.width / 2,  // 元素中心點相對於 container 的 X 座標
+      y: rect.top - containerRect.top - offsetY            // 元素頂部相對於 container 的 Y 座標
+    }
+
+    setHighlightPopover({
+      isVisible: true,
+      position,
+      highlight
+    })
+  }
+
+  // 隱藏高亮 Popover
+  const hideHighlightPopover = () => {
+    setHighlightPopover({
+      isVisible: false,
+      position: null,
+      highlight: null
+    })
+  }
+
+  // 處理高亮點擊事件
+  const handleHighlightClick = (event: MouseEvent) => {
+    const target = event.target as Element
+    const highlightElement = target.closest('[data-highlight-id]') as HTMLElement
+    
+    if (!highlightElement) return
+
+    const highlightId = highlightElement.getAttribute('data-highlight-id')
+    if (!highlightId) return
+
+    // 找到對應的高亮記錄
+    const highlight = markSection.highlights.find(h => h.id === highlightId)
+    if (!highlight) return
+
+    showHighlightPopover(highlightElement, highlight)
+  }
+
+  // 刪除高亮
+  const deleteHighlight = async (highlightId: string) => {
+    try {
+      await markSection.removeHighlight(highlightId)
+      hideHighlightPopover()
+    } catch (error) {
+      console.error('刪除高亮失敗:', error)
     }
   }
 
@@ -321,7 +275,7 @@ export function StructuredMarkdownRenderer({
           
           // 根據類型設置不同的樣式和屬性
           if (type === 'highlight') {
-            mark.className = 'bg-yellow-200 px-1 rounded'
+            mark.className = 'bg-yellow-200 px-1 rounded cursor-pointer'
             mark.setAttribute('data-highlight-id', id)
           } else if (type === 'comment') {
             mark.className = 'bg-blue-100 border-b-2 border-blue-300 px-1 rounded cursor-pointer hover:bg-blue-200'
@@ -352,7 +306,12 @@ export function StructuredMarkdownRenderer({
     if (!container) return
 
     container.addEventListener('click', handleCommentClick)
-    return () => container.removeEventListener('click', handleCommentClick)
+    container.addEventListener('click', handleHighlightClick)
+    
+    return () => {
+      container.removeEventListener('click', handleCommentClick)
+      container.removeEventListener('click', handleHighlightClick)
+    }
   }, [handleCommentClick])
 
   return (
@@ -395,6 +354,16 @@ export function StructuredMarkdownRenderer({
         onClose={hideCommentPopover}
         onDeleteComment={deleteComment}
         isDeleting={isSubmitting}
+      />
+
+      {/* 高亮 Popover */}
+      <HighlightPopover 
+        isVisible={highlightPopover.isVisible && !!highlightPopover.position && !!highlightPopover.highlight}
+        position={highlightPopover.position}
+        highlight={highlightPopover.highlight}
+        onClose={hideHighlightPopover}
+        onDeleteHighlight={deleteHighlight}
+        isDeleting={markSection.isSubmitting}
       />
     </div>
   )
