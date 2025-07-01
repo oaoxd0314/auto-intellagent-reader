@@ -1,7 +1,5 @@
 # 🚀 Controller-Facade 簡化架構開發指南
 
-歡迎來到 auto-intellagent-reader 專案！這是一個採用 **Controller-Facade Pattern** 的現代化 React 應用，專為靜態 MDX 文件閱讀和互動而設計。
-
 ## 🎯 架構核心理念
 
 ### **「UI 只與 Hook 交互」**
@@ -27,7 +25,7 @@ UI Components ← → Hook (唯一交互層)
           Context/Factory/Services
 ```
 
-這個簡化架構專為靜態文件場景優化，提供最佳的開發體驗和維護性。
+此架構專為靜態文件場景優化，提供最佳的開發體驗和維護性。
 
 ## 🛠️ 開發工作流
 
