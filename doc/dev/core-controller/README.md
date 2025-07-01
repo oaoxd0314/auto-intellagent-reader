@@ -1,379 +1,467 @@
-# 控制器架構實作規格 - AI Agent 輔助系統
+# AI Agent 系統技術實作規格
 
-## 🎯 目標功能
+## 🎯 系統概述
 
-基於用戶行為分析的 AI 建議系統，提供智能化的閱讀輔助功能。
+採用 Controller-Facade Pattern 實現 AI Agent 系統的技術架構。
 
-1. **Event Tracker** - 用戶行為追蹤和分析
-2. **Agent Controller** - 基於行為的智能建議生成
-3. **Suggestion Controller** - 建議展示和用戶決策處理
-4. **Action Executor** - 執行用戶接受的建議
+### 📋 當前開發階段
 
-## 📋 功能清單
+**階段 1: Background AI Agent 基礎建立** 🚀 (當前重點)
+- 創建 AIAgent Context
+- OpenRouter API 整合
+- 基礎事件監聽
+- 數據流測試
 
-### Phase 2: AI 輔助系統 🤖
-- [ ] **行為追蹤系統**
-  - [ ] 滾動行為追蹤
-  - [ ] 停留時間分析
-  - [ ] 文本選擇檢測
-  - [ ] 退出行為記錄
-- [ ] **智能建議系統**
-  - [ ] 規則引擎
-  - [ ] 建議生成邏輯
-  - [ ] 用戶偏好學習
-- [ ] **建議 UI 系統**
-  - [ ] 右下角提示組件
-  - [ ] Accept/Reject 機制
-  - [ ] 建議歷史記錄
+---
 
-## 🏗️ 技術架構
+## 🏗️ 階段 1 技術實作：Background AI Agent
 
-### 資料流架構
-```
-User Behavior → EventTracker → AgentController → SuggestionController → ActionExecutor
-     ↓              ↓              ↓                ↓                    ↓
-   用戶行為        行為分析        建議生成          UI展示              執行動作
-```
+### 核心目標
+建立可以在背景運作的 AI agent instance，串接 OpenRouter，讓他可以簡單吃到目前的 observe 事件。
 
-### 1. 事件追蹤控制器
-**核心功能：** 追蹤和分析用戶閱讀行為
+### 1. AIAgent Context 設計
 
 ```typescript
-// src/controllers/EventTracker.ts
-interface UserEvent {
-  type: 'scroll' | 'pause' | 'click' | 'select' | 'exit'
+// src/contexts/AIAgentContext.tsx
+interface AIAgentState {
+  isInitialized: boolean
+  isConnected: boolean
+  connectionStatus: 'idle' | 'connecting' | 'connected' | 'error'
+  lastEvent: BehaviorEvent | null
+  eventQueue: BehaviorEvent[]
+  error: string | null
+}
+
+interface AIAgentContextType extends AIAgentState {
+  // 初始化
+  initializeAgent: () => Promise<void>
+  
+  // 連線管理
+  connect: () => Promise<void>
+  disconnect: () => void
+  
+  // 事件處理
+  processEvent: (event: BehaviorEvent) => void
+  clearEventQueue: () => void
+  
+  // 錯誤處理
+  clearError: () => void
+}
+
+interface BehaviorEvent {
+  type: 'post_view' | 'text_selection' | 'comment_add' | 'scroll_pause'
   timestamp: number
   context: {
-    postId: string
-    position: number      // 滾動位置或點擊位置
-    duration?: number     // 停留時間
-    selectedText?: string // 選中的文本
-    elementId?: string    // 相關元素ID
+    postId?: string
+    selectedText?: string
+    position?: number
+    duration?: number
   }
-}
-
-interface BehaviorSummary {
-  totalTime: number
-  scrollDepth: number
-  pauseCount: number
-  selectionCount: number
-  engagementScore: number
-}
-
-class EventTracker extends AbstractController {
-  // 行為追蹤
-  trackScroll(position: number): void
-  trackPause(duration: number): void
-  trackTextSelection(text: string, elementId?: string): void
-  trackClick(elementId: string): void
-  trackExit(): void
-  
-  // 數據分析
-  getBehaviorSummary(): BehaviorSummary
-  getEvents(): UserEvent[]
-  
-  // 自動追蹤
-  startTracking(): void
-  stopTracking(): void
-}
-```
-
-### 2. Agent 控制器
-**核心功能：** 基於行為數據生成智能建議
-
-```typescript
-// src/controllers/AgentController.ts
-interface Suggestion {
-  id: string
-  type: 'bookmark' | 'note' | 'summary' | 'related' | 'break'
-  title: string
-  description: string
-  confidence: number    // 0-1 建議信心度
-  priority: number      // 1-5 優先級
-  action: () => Promise<void>
   metadata?: Record<string, any>
 }
-
-interface SuggestionRule {
-  name: string
-  condition: (events: UserEvent[], summary: BehaviorSummary) => boolean
-  generator: (events: UserEvent[], summary: BehaviorSummary) => Suggestion
-  cooldown: number      // 冷卻時間（毫秒）
-}
-
-class AgentController extends AbstractController {
-  private rules: SuggestionRule[]
-  private lastSuggestions: Map<string, number>
-  
-  // 建議生成
-  analyzeBehavior(events: UserEvent[], summary: BehaviorSummary): Promise<Suggestion[]>
-  
-  // 規則管理
-  addRule(rule: SuggestionRule): void
-  removeRule(name: string): void
-  
-  // 內建規則
-  private createBookmarkRule(): SuggestionRule
-  private createNoteRule(): SuggestionRule
-  private createSummaryRule(): SuggestionRule
-  private createBreakRule(): SuggestionRule
-  
-  // 學習機制
-  updatePreferences(suggestionId: string, accepted: boolean): void
-  getPreferences(): Record<string, number>
-}
 ```
 
-### 3. 建議控制器
-**核心功能：** 管理建議的展示和用戶決策
+### 2. OpenRouter API 整合
 
 ```typescript
-// src/controllers/SuggestionController.ts
-interface SuggestionState {
-  activeSuggestion: Suggestion | null
-  isVisible: boolean
-  position: { x: number; y: number }
-  history: SuggestionHistory[]
-  queue: Suggestion[]
+// src/services/OpenRouterService.ts
+interface OpenRouterConfig {
+  apiKey: string
+  baseURL: string
+  model: string
+  maxTokens: number
 }
 
-interface SuggestionHistory {
-  suggestion: Suggestion
-  timestamp: number
-  decision: 'accepted' | 'rejected' | 'ignored'
-  executionResult?: 'success' | 'error'
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
 }
 
-class SuggestionController extends AbstractController<SuggestionState> {
-  // 建議展示
-  showSuggestion(suggestion: Suggestion): void
-  hideSuggestion(): void
-  queueSuggestion(suggestion: Suggestion): void
-  
-  // 用戶決策
-  acceptSuggestion(): Promise<void>
-  rejectSuggestion(): void
-  ignoreSuggestion(): void
-  
-  // 歷史管理
-  getHistory(): SuggestionHistory[]
-  clearHistory(): void
-  
-  // 佇列管理
-  processQueue(): void
-  clearQueue(): void
-}
-```
-
-### 4. 動作執行器
-**核心功能：** 執行用戶接受的建議
-
-```typescript
-// src/controllers/ActionExecutor.ts
-interface ActionResult {
-  success: boolean
-  message?: string
-  data?: any
-}
-
-class ActionExecutor extends AbstractController {
-  // 動作執行
-  executeBookmark(postId: string): Promise<ActionResult>
-  executeNote(postId: string, selectedText?: string): Promise<ActionResult>
-  executeSummary(postId: string): Promise<ActionResult>
-  executeBreak(): Promise<ActionResult>
-  
-  // 通用執行器
-  execute(action: () => Promise<void>): Promise<ActionResult>
-  
-  // 結果處理
-  handleSuccess(result: ActionResult): void
-  handleError(error: Error): void
-}
-```
-
-## 🔧 服務層設計
-
-### 1. 行為數據服務
-```typescript
-// src/services/BehaviorService.ts
-interface BehaviorData {
-  postId: string
-  events: UserEvent[]
-  summary: BehaviorSummary
-  suggestions: SuggestionHistory[]
-  preferences: Record<string, number>
-  lastUpdated: number
-}
-
-class BehaviorService {
-  static async saveBehavior(data: BehaviorData): Promise<void>
-  static async loadBehavior(postId: string): Promise<BehaviorData | null>
-  static async updatePreferences(preferences: Record<string, number>): Promise<void>
-  static async getGlobalPreferences(): Promise<Record<string, number>>
-}
-```
-
-### 2. 建議服務
-```typescript
-// src/services/SuggestionService.ts
-class SuggestionService {
-  static async logSuggestion(suggestion: Suggestion, decision: string): Promise<void>
-  static async getSuggestionStats(): Promise<Record<string, number>>
-  static async getEffectiveRules(): Promise<SuggestionRule[]>
-}
-```
-
-## 📦 UI 組件設計
-
-### 1. 建議提示組件
-```typescript
-// src/components/SuggestionHint.tsx
-interface SuggestionHintProps {
-  suggestion: Suggestion | null
-  isVisible: boolean
-  onAccept: () => void
-  onReject: () => void
-  onIgnore: () => void
-}
-
-export function SuggestionHint(props: SuggestionHintProps): JSX.Element
-```
-
-### 2. 建議歷史組件
-```typescript
-// src/components/SuggestionHistory.tsx
-interface SuggestionHistoryProps {
-  history: SuggestionHistory[]
-  onClear: () => void
-}
-
-export function SuggestionHistory(props: SuggestionHistoryProps): JSX.Element
-```
-
-## 🗂️ 數據存儲設計
-
-### LocalStorage 結構
-```typescript
-interface StorageSchema {
-  // 行為數據
-  'behavior:{postId}': BehaviorData
-  
-  // 全局偏好
-  'preferences:global': Record<string, number>
-  
-  // 建議統計
-  'suggestions:stats': Record<string, number>
-}
-```
-
-## 📋 實作清單
-
-### Phase 2.1: 基礎架構 🏗️
-- [ ] 創建 `src/controllers/` 目錄
-- [ ] 實作 `AbstractController` 基類
-- [ ] 建立事件系統和狀態管理
-- [ ] 創建基礎類型定義
-
-### Phase 2.2: 行為追蹤 📊
-- [ ] 實作 `EventTracker` 控制器
-- [ ] 添加滾動、停留、選擇追蹤
-- [ ] 實作 `BehaviorService` 存儲邏輯
-- [ ] 行為數據分析算法
-
-### Phase 2.3: 建議系統 🤖
-- [ ] 實作 `AgentController` 控制器
-- [ ] 創建基本建議規則
-- [ ] 實作 `SuggestionService`
-- [ ] 用戶偏好學習機制
-
-### Phase 2.4: 建議 UI 💡
-- [ ] 實作 `SuggestionController`
-- [ ] 創建 `SuggestionHint` 組件
-- [ ] Accept/Reject 機制
-- [ ] 建議佇列管理
-
-### Phase 2.5: 動作執行 ⚡
-- [ ] 實作 `ActionExecutor`
-- [ ] 各種建議動作實現
-- [ ] 結果反饋機制
-- [ ] 錯誤處理
-
-### Phase 2.6: 整合測試 🧪
-- [ ] 控制器協調測試
-- [ ] 建議品質測試
-- [ ] 用戶體驗測試
-- [ ] 性能優化
-
-## 🎯 建議規則範例
-
-### 1. 收藏建議
-```typescript
-const bookmarkRule: SuggestionRule = {
-  name: 'bookmark',
-  condition: (events, summary) => {
-    return summary.totalTime > 300000 && // 5分鐘以上
-           summary.scrollDepth > 0.8 &&  // 滾動超過80%
-           summary.engagementScore > 0.7  // 高參與度
-  },
-  generator: (events, summary) => ({
-    id: `bookmark-${Date.now()}`,
-    type: 'bookmark',
-    title: '收藏這篇文章',
-    description: '你似乎對這篇文章很感興趣，要收藏起來嗎？',
-    confidence: 0.8,
-    priority: 3,
-    action: async () => {
-      // 執行收藏邏輯
+interface StreamResponse {
+  id: string
+  choices: Array<{
+    delta: {
+      content?: string
     }
-  }),
-  cooldown: 600000 // 10分鐘冷卻
+    finish_reason?: string
+  }>
 }
-```
 
-### 2. 筆記建議
-```typescript
-const noteRule: SuggestionRule = {
-  name: 'note',
-  condition: (events, summary) => {
-    return summary.selectionCount > 2 && // 選擇過文本
-           events.some(e => e.type === 'select')
-  },
-  generator: (events, summary) => {
-    const lastSelection = events
-      .filter(e => e.type === 'select')
-      .pop()
-    
-    return {
-      id: `note-${Date.now()}`,
-      type: 'note',
-      title: '記錄重點',
-      description: '要為選中的內容做筆記嗎？',
-      confidence: 0.9,
-      priority: 4,
-      action: async () => {
-        // 執行筆記邏輯
+class OpenRouterService {
+  private config: OpenRouterConfig
+  private eventSource: EventSource | null = null
+  
+  constructor(config: OpenRouterConfig) {
+    this.config = config
+  }
+  
+  // SSE 連線
+  async createSSEConnection(
+    messages: ChatMessage[],
+    onMessage: (content: string) => void,
+    onError: (error: Error) => void,
+    onComplete: () => void
+  ): Promise<void> {
+    const response = await fetch(`${this.config.baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
       },
-      metadata: { selectedText: lastSelection?.context.selectedText }
+      body: JSON.stringify({
+        model: this.config.model,
+        messages,
+        max_tokens: this.config.maxTokens,
+        stream: true
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.statusText}`)
     }
-  },
-  cooldown: 300000 // 5分鐘冷卻
+    
+    const reader = response.body?.getReader()
+    const decoder = new TextDecoder()
+    
+    try {
+      while (true) {
+        const { done, value } = await reader!.read()
+        if (done) break
+        
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n').filter(line => line.trim() !== '')
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') {
+              onComplete()
+              return
+            }
+            
+            try {
+              const parsed: StreamResponse = JSON.parse(data)
+              const content = parsed.choices[0]?.delta?.content
+              if (content) {
+                onMessage(content)
+              }
+            } catch (err) {
+              console.warn('Failed to parse SSE data:', data)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      onError(error as Error)
+    }
+  }
+  
+  // 簡單聊天
+  async chat(messages: ChatMessage[]): Promise<string> {
+    const response = await fetch(`${this.config.baseURL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        messages,
+        max_tokens: this.config.maxTokens,
+        stream: false
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.statusText}`)
+    }
+    
+    const data = await response.json()
+    return data.choices[0]?.message?.content || ''
+  }
+  
+  // 關閉連線
+  closeConnection(): void {
+    if (this.eventSource) {
+      this.eventSource.close()
+      this.eventSource = null
+    }
+  }
 }
 ```
 
-## 🔮 擴展規劃
+### 3. AI Agent Controller 設計
 
-### 短期擴展
-- 更多建議類型（相關文章、總結等）
-- 建議品質改進算法
-- 用戶自定義規則
+```typescript
+// src/controllers/AIAgentController.ts
+class AIAgentController extends AbstractController {
+  private openRouterService: OpenRouterService
+  private eventBuffer: BehaviorEvent[] = []
+  private isProcessing = false
+  
+  constructor(
+    private aiAgentContext: AIAgentContext,
+    private behaviorContext: BehaviorContext,
+    private postContext: PostContext,
+    private interactionContext: InteractionContext
+  ) {
+    super()
+    
+    this.openRouterService = new OpenRouterService({
+      apiKey: import.meta.env.VITE_OPENROUTER_API_KEY,
+      baseURL: 'https://openrouter.ai/api/v1',
+      model: 'anthropic/claude-3-haiku',
+      maxTokens: 1000
+    })
+  }
+  
+  // 初始化 AI Agent
+  async initializeAgent(): Promise<void> {
+    try {
+      this.aiAgentContext.updateStatus('connecting')
+      
+      // 測試 API 連線
+      const testResponse = await this.openRouterService.chat([
+        { role: 'system', content: 'You are a reading assistant AI.' },
+        { role: 'user', content: 'Hello, can you help me with reading?' }
+      ])
+      
+      if (testResponse) {
+        this.aiAgentContext.updateStatus('connected')
+        this.startEventListening()
+      }
+    } catch (error) {
+      this.aiAgentContext.setError(error.message)
+      this.aiAgentContext.updateStatus('error')
+    }
+  }
+  
+  // 開始事件監聽
+  private startEventListening(): void {
+    // 監聽現有的 Context 事件
+    this.behaviorContext.onBehaviorEvent((event) => {
+      this.processEvent({
+        type: 'scroll_pause',
+        timestamp: Date.now(),
+        context: {
+          position: event.scrollPosition,
+          duration: event.pauseDuration
+        }
+      })
+    })
+    
+    this.postContext.onPostView((postId) => {
+      this.processEvent({
+        type: 'post_view',
+        timestamp: Date.now(),
+        context: { postId }
+      })
+    })
+    
+    this.interactionContext.onTextSelection((text, elementId) => {
+      this.processEvent({
+        type: 'text_selection',
+        timestamp: Date.now(),
+        context: { selectedText: text },
+        metadata: { elementId }
+      })
+    })
+  }
+  
+  // 處理事件
+  private processEvent(event: BehaviorEvent): void {
+    this.eventBuffer.push(event)
+    this.aiAgentContext.addEventToQueue(event)
+    
+    // 簡單的批次處理 (每 5 個事件或 10 秒處理一次)
+    if (this.eventBuffer.length >= 5 || this.shouldProcessByTime()) {
+      this.processEventBatch()
+    }
+  }
+  
+  // 批次處理事件
+  private async processEventBatch(): Promise<void> {
+    if (this.isProcessing || this.eventBuffer.length === 0) return
+    
+    this.isProcessing = true
+    const events = [...this.eventBuffer]
+    this.eventBuffer = []
+    
+    try {
+      const contextPrompt = this.buildContextPrompt(events)
+      const messages: ChatMessage[] = [
+        {
+          role: 'system',
+          content: `你是一個閱讀助手 AI。根據用戶的行為事件，判斷是否應該提供建議。
+          
+          如果需要建議，回覆 JSON 格式：
+          {"shouldSuggest": true, "reason": "建議原因"}
+          
+          如果不需要建議，回覆：
+          {"shouldSuggest": false, "reason": "不建議的原因"}`
+        },
+        {
+          role: 'user',
+          content: contextPrompt
+        }
+      ]
+      
+      const response = await this.openRouterService.chat(messages)
+      
+      try {
+        const analysis = JSON.parse(response)
+        console.log('AI 分析結果:', analysis)
+        
+        // 這個階段只記錄，不採取行動
+        if (analysis.shouldSuggest) {
+          console.log('AI 建議觸發:', analysis.reason)
+        }
+      } catch (parseError) {
+        console.warn('無法解析 AI 回應:', response)
+      }
+      
+    } catch (error) {
+      console.error('AI 事件處理失敗:', error)
+    } finally {
+      this.isProcessing = false
+    }
+  }
+  
+  // 建立上下文 Prompt
+  private buildContextPrompt(events: BehaviorEvent[]): string {
+    const currentPost = this.postContext.getCurrentPost()
+    const postContext = currentPost ? `當前文章: ${currentPost.title}` : '無當前文章'
+    
+    const eventSummary = events.map(event => {
+      switch (event.type) {
+        case 'post_view':
+          return `查看文章: ${event.context.postId}`
+        case 'text_selection':
+          return `選擇文字: "${event.context.selectedText?.slice(0, 50)}..."`
+        case 'scroll_pause':
+          return `滾動停留: ${event.context.duration}ms at ${event.context.position}`
+        case 'comment_add':
+          return `新增評論`
+        default:
+          return `其他事件: ${event.type}`
+      }
+    }).join('\n')
+    
+    return `${postContext}
 
-### 中期擴展
-- 跨文章行為分析
-- 個人化建議模型
-- 協作建議功能
+最近的用戶行為:
+${eventSummary}
 
-### 長期擴展
-- AI 模型整合
-- 雲端數據同步
-- 多平台支持 
+請分析這些行為是否需要提供閱讀建議。`
+  }
+  
+  // 時間檢查
+  private shouldProcessByTime(): boolean {
+    // 簡單實現：每 10 秒檢查一次
+    return Date.now() % 10000 < 1000
+  }
+  
+  // 獲取狀態
+  getConnectionStatus(): string {
+    return this.aiAgentContext.getConnectionStatus()
+  }
+  
+  getRecentEvents(): BehaviorEvent[] {
+    return this.aiAgentContext.getEventQueue()
+  }
+  
+  // 清理
+  cleanup(): void {
+    this.openRouterService.closeConnection()
+    this.eventBuffer = []
+    this.isProcessing = false
+  }
+}
+```
+
+### 4. Hook 整合
+
+```typescript
+// src/hooks/useAIAgent.ts
+export function useAIAgent() {
+  const controller = useAIAgentController()
+  const [isInitializing, setIsInitializing] = useState(false)
+  const [initError, setInitError] = useState<string | null>(null)
+  
+  // 初始化 AI Agent
+  const initializeAgent = useCallback(async () => {
+    setIsInitializing(true)
+    setInitError(null)
+    
+    try {
+      await controller.initializeAgent()
+    } catch (error) {
+      setInitError(error.message)
+    } finally {
+      setIsInitializing(false)
+    }
+  }, [controller])
+  
+  // 自動初始化
+  useEffect(() => {
+    initializeAgent()
+  }, [initializeAgent])
+  
+  return {
+    // 狀態
+    connectionStatus: controller.getConnectionStatus(),
+    recentEvents: controller.getRecentEvents(),
+    isInitializing,
+    initError,
+    
+    // 操作
+    reinitialize: initializeAgent,
+    clearError: () => setInitError(null)
+  }
+}
+```
+
+---
+
+## 🔄 後續階段預覽
+
+### 階段 2: 事件觸發頻率測試 (下一階段)
+- 觀察 AI 觸發頻率
+- 事件過濾規則
+- 性能基線建立
+
+### 階段 3: LLM Event Queue & Toast UI
+- Message Queue 系統
+- Toast 組件實作
+- 用戶交互處理
+
+### 階段 4-6: 後續實現
+- Message Queue 系統
+- Toast 組件實作
+- 用戶交互處理
+
+---
+
+## 🛠️ 開發注意事項
+
+### 環境配置
+```bash
+# .env
+VITE_OPENROUTER_API_KEY=your_api_key_here
+```
+
+### 依賴安裝
+```bash
+pnpm add @types/eventsource  # SSE 支援
+```
+
+### 調試工具
+- Console logging 追蹤事件流
+- React DevTools 檢查 Context 狀態
+- Network Tab 監控 API 調用
+
+---
+
+**參考文檔：**
+- [Controller 架構](../architecture.md) - 技術架構設計
+- [狀態流管理](../state-flow.md) - 數據流設計 

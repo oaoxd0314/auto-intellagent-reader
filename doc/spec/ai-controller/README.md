@@ -1,561 +1,758 @@
-# 智能控制器實作規格
+# AI Agent 控制器實作規格
 
 ## 🎯 目標功能
 
-1. **Observer Pattern** - 用戶行為監聽系統
-2. **ForesightJS Integration** - 鼠標意圖預測整合
-3. **Behavior Analytics** - 用戶行為數據收集
-4. **Data Pipeline** - 為 Local LLM 準備數據
+本規格定義了新一代 AI Agent 控制器的完整架構，包含：
 
-## 📋 功能清單
+1. **Background SSE Agent** - 持續運行的智能代理
+2. **OpenRouter API 整合** - 大語言模型服務串接
+3. **Observer Data Pipeline** - 用戶行為數據收集管道
+4. **Message Queue System** - 智能建議訊息佇列
+5. **Context Event Integration** - 上下文事件整合
 
-### Phase 3: 智能控制器 🤖
-- [ ] **行為監聽系統**
-  - [ ] 滾動行為分析
-  - [ ] 停留時間檢測
-  - [ ] 文本選擇追蹤
-- [ ] **智能觸發機制**
-  - [ ] 條件判斷邏輯
-  - [ ] 頻率控制
-  - [ ] 相關性評分
+## 📋 核心功能清單
 
-## 🏗️ 技術架構
+### 階段 1: Background AI Agent 基礎建立 🚀
+- [ ] **AIAgent Context 創建**
+  - [ ] 連線狀態管理
+  - [ ] 事件監聽機制
+  - [ ] 錯誤處理和恢復
+- [ ] **OpenRouter API 整合**
+  - [ ] API 金鑰配置
+  - [ ] SSE 連線建立
+  - [ ] 串流數據處理
+- [ ] **基礎事件監聽**
+  - [ ] Context 事件訂閱
+  - [ ] 事件數據打包
+  - [ ] 實時數據傳輸
 
-### 資料流架構
+### 階段 2: 事件觸發頻率測試 📊
+- [ ] **觸發頻率分析**
+  - [ ] 事件頻率監控
+  - [ ] 高價值事件識別
+  - [ ] 過濾規則建立
+- [ ] **AI 反應測試**
+  - [ ] 回應合理性評估
+  - [ ] 敏感度參數調整
+  - [ ] 基線性能建立
+
+### 階段 3: LLM Event Queue & Toast UI 🎨
+- [ ] **Message Queue 系統**
+  - [ ] 訊息佇列管理
+  - [ ] 優先級排序
+  - [ ] 頻率控制機制
+- [ ] **Toast Queue UI**
+  - [ ] shadcn Toast 整合
+  - [ ] 多 Toast 疊加顯示
+  - [ ] 用戶交互處理
+
+## 🏗️ 系統架構
+
+### 整體架構圖
 ```
-User Actions → Observers → Controller → Data Collector → LLM Pipeline
-     ↓            ↓           ↓              ↓              ↓
-  用戶行為      觀察者      智能分析        數據整理      LLM 處理
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   User Actions  │───▶│  Context Events  │───▶│  AI Agent Core  │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Observer System │    │ Event Pipeline   │    │ OpenRouter API  │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  Data Analysis  │    │ Message Queue    │    │  Toast Queue    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-### ForesightJS 整合分析
+### 數據流向
+```
+User Interaction
+       ↓
+Context Events (BehaviorContext, InteractionContext, PostContext)
+       ↓
+Event Observer & Data Pipeline
+       ↓
+AI Agent Processing (OpenRouter)
+       ↓
+Message Queue System
+       ↓
+Toast Queue UI
+       ↓
+User Action Execution
+```
 
-基於 [ForesightJS 文檔](https://foresightjs.com/llms.txt)，我們可以獲得以下數據：
+## 🤖 AIAgent Context 詳細規格
 
-#### 1. 鼠標預測數據
+### Context 狀態介面
 ```typescript
-// ForesightJS 提供的數據結構
-interface ForesightData {
-  // 鼠標軌跡預測
-  predictedElement: HTMLElement | null
-  confidence: number              // 0-1 預測信心度
-  trajectory: {
-    x: number
-    y: number
-    timestamp: number
-  }[]
+interface AIAgentState {
+  // 連線管理
+  isConnected: boolean
+  connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error'
+  lastHeartbeat: number
+  reconnectAttempts: number
+  maxReconnectAttempts: number
   
-  // 預測的交互類型
-  intentType: 'hover' | 'click' | 'scroll'
+  // 訊息佇列
+  messageQueue: AIMessage[]
+  activeToasts: ToastMessage[]
+  queueLength: number
+  maxQueueSize: number
   
-  // 元素資訊
-  targetInfo: {
-    tagName: string
-    className: string
-    textContent: string
-    boundingRect: DOMRect
+  // 上下文資訊
+  context: {
+    currentBehavior: BehaviorData
+    recentInteractions: InteractionData[]
+    userPatterns: UserPatternData
+    pageState: PageState
+    availableActions: ContextAction[]
+  }
+  
+  // 效能監控
+  performance: {
+    averageResponseTime: number
+    totalRequests: number
+    successRate: number
+    errorCount: number
+  }
+  
+  // 設定
+  settings: {
+    maxQueueSize: number
+    suggestionFrequency: 'low' | 'medium' | 'high'
+    enabledStrategies: string[]
+    languagePreference: string
+    autoHideDelay: number
+    maxVisibleToasts: number
   }
 }
 ```
 
-#### 2. ForesightJS Hook 實作
+### Context Actions
 ```typescript
-// src/hooks/useForesight.ts
-interface ForesightHookConfig {
-  onPrediction: (data: ForesightData) => void
-  onHover: (element: HTMLElement) => void
-  onClick: (element: HTMLElement) => void
-  threshold: number               // 預測觸發閾值
-  debounceMs: number             // 防抖時間
-}
-
-export function useForesight(config: ForesightHookConfig) {
-  // 初始化 ForesightJS
-  // 設置事件監聽
-  // 返回控制方法
-}
-```
-
-## 🔍 Observer Pattern 實作
-
-### 1. 抽象觀察者
-```typescript
-// src/observers/AbstractObserver.ts
-abstract class AbstractObserver<T = any> {
-  protected isActive: boolean = false
-  protected callbacks: ((data: T) => void)[] = []
+interface AIAgentActions {
+  // 連線控制
+  connect: () => Promise<void>
+  disconnect: () => Promise<void>
+  reconnect: () => Promise<void>
   
-  abstract start(): void
-  abstract stop(): void
-  abstract cleanup(): void
+  // 訊息管理
+  sendMessage: (message: string, context: any) => Promise<void>
+  addToQueue: (message: AIMessage) => void
+  processQueue: () => Promise<void>
+  clearQueue: () => void
   
-  // 訂閱系統
-  subscribe(callback: (data: T) => void): () => void
-  unsubscribe(callback: (data: T) => void): void
+  // Toast 管理
+  showToast: (message: AIMessage) => void
+  hideToast: (messageId: string) => void
+  executeAction: (message: AIMessage) => Promise<void>
   
-  // 數據發送
-  protected notify(data: T): void
+  // 設定管理
+  updateSettings: (settings: Partial<AIAgentSettings>) => void
+  resetSettings: () => void
+  
+  // 事件處理
+  handleContextEvent: (eventName: string, payload: any) => void
+  subscribeToContext: (contextName: string) => void
+  unsubscribeFromContext: (contextName: string) => void
 }
 ```
 
-### 2. 滾動行為觀察者
+## 🔌 OpenRouter API 整合
+
+### API 配置
 ```typescript
-// src/observers/ScrollObserver.ts
-interface ScrollData {
-  scrollTop: number
-  scrollHeight: number
-  clientHeight: number
-  scrollPercent: number
-  direction: 'up' | 'down'
-  velocity: number
+interface OpenRouterConfig {
+  apiKey: string
+  baseURL: string
+  model: string
+  temperature: number
+  maxTokens: number
+  streamEnabled: boolean
+  timeout: number
+  retryAttempts: number
+}
+
+interface OpenRouterClient {
+  // 基礎方法
+  initialize: (config: OpenRouterConfig) => Promise<void>
+  destroy: () => Promise<void>
+  
+  // 串流方法
+  createStream: (prompt: string, context: any) => Promise<ReadableStream>
+  sendMessage: (message: string, context: any) => Promise<string>
+  
+  // 事件處理
+  onMessage: (callback: (message: string) => void) => void
+  onError: (callback: (error: Error) => void) => void
+  onConnect: (callback: () => void) => void
+  onDisconnect: (callback: () => void) => void
+}
+```
+
+### SSE 連線管理
+```typescript
+class SSEConnectionManager {
+  private connection: EventSource | null = null
+  private reconnectTimer: NodeJS.Timeout | null = null
+  private heartbeatTimer: NodeJS.Timeout | null = null
+  
+  async connect(url: string, options: SSEOptions): Promise<void>
+  async disconnect(): Promise<void>
+  async reconnect(): Promise<void>
+  
+  private startHeartbeat(): void
+  private handleConnectionError(error: Event): void
+  private handleMessage(event: MessageEvent): void
+}
+```
+
+## 📊 Observer Data Pipeline
+
+### Frame 級別追蹤
+```typescript
+interface FrameObserver {
+  // 停留時間追蹤
+  trackDwellTime: (element: HTMLElement) => Observable<DwellTimeData>
+  
+  // 懸停和選擇追蹤
+  trackHoverSections: () => Observable<HoverData[]>
+  trackSelectedSections: () => Observable<SelectionData[]>
+  
+  // 滾動和活躍元素
+  trackScrollDepth: () => Observable<ScrollData>
+  trackActiveElements: () => Observable<ActiveElementData[]>
+  
+  // 注意力分析
+  calculateAttentionScore: (data: FrameEventData) => number
+  identifyReadingPattern: (data: FrameEventData) => ReadingPattern
+}
+
+interface FrameEventData {
+  dwellTime: number
+  hoveredSections: string[]
+  selectedSections: string[]
+  scrollDepth: number
+  activeElements: ActiveElementData[]
+  attentionScore: number
+  readingPattern: 'scanning' | 'reading' | 'studying' | 'skimming'
   timestamp: number
-  element: HTMLElement
-}
-
-class ScrollObserver extends AbstractObserver<ScrollData> {
-  private lastScrollTop: number = 0
-  private scrollHistory: number[] = []
-  
-  start(): void {
-    // 監聽滾動事件
-    // 計算滾動速度和方向
-    // 記錄滾動歷史
-  }
-  
-  // 分析方法
-  getScrollPattern(): 'reading' | 'scanning' | 'searching'
-  getReadingSpeed(): number
-  getScrollStops(): { position: number; duration: number }[]
+  sessionId: string
 }
 ```
 
-### 3. 停留時間觀察者
+### 用戶模式追蹤
 ```typescript
-// src/observers/DwellTimeObserver.ts
-interface DwellData {
-  element: HTMLElement
-  startTime: number
-  endTime: number
-  duration: number
-  elementType: string
-  textContent: string
-  position: DOMRect
+interface UserPatternTracker {
+  // 標籤偏好分析
+  analyzeTagPreferences: () => TagPreferenceData[]
+  
+  // 評論模式識別
+  analyzeCommentPatterns: () => CommentPatternData[]
+  
+  // 互動行為統計
+  analyzeInteractionActions: () => InteractionActionData[]
+  
+  // 閱讀習慣建檔
+  analyzeReadingHabits: () => ReadingHabitsData
+  
+  // 模式預測
+  predictUserBehavior: (context: any) => BehaviorPrediction
 }
 
-class DwellTimeObserver extends AbstractObserver<DwellData> {
-  private activeElements: Map<HTMLElement, number> = new Map()
-  private dwellThreshold: number = 1000 // 1秒
-  
-  start(): void {
-    // 監聽鼠標進入/離開事件
-    // 計算停留時間
-    // 識別重要元素
-  }
-  
-  // 分析方法
-  getInterestingElements(): HTMLElement[]
-  getAverageReadingTime(): number
-  getAttentionHeatmap(): { element: HTMLElement; score: number }[]
+interface UserPatternData {
+  tagPreferences: TagPreferenceData[]
+  commentPatterns: CommentPatternData[]
+  interactionActions: InteractionActionData[]
+  readingHabits: ReadingHabitsData
+  lastUpdated: number
+  dataVersion: string
 }
 ```
 
-### 4. 文本選擇觀察者
+## 📨 Message Queue System
+
+### 佇列管理
 ```typescript
-// src/observers/SelectionObserver.ts
-interface SelectionData {
-  selectedText: string
-  range: Range
-  startContainer: Node
-  endContainer: Node
-  commonAncestor: Node
-  timestamp: number
-  selectionType: 'word' | 'sentence' | 'paragraph' | 'custom'
+interface MessageQueue {
+  // 基礎操作
+  enqueue: (message: AIMessage) => void
+  dequeue: () => AIMessage | null
+  peek: () => AIMessage | null
+  clear: () => void
+  
+  // 排序和過濾
+  prioritize: () => void
+  filter: (predicate: (message: AIMessage) => boolean) => AIMessage[]
+  
+  // 狀態查詢
+  size: () => number
+  isEmpty: () => boolean
+  isFull: () => boolean
+  
+  // 事件
+  onEnqueue: (callback: (message: AIMessage) => void) => void
+  onDequeue: (callback: (message: AIMessage) => void) => void
+  onFull: (callback: () => void) => void
 }
 
-class SelectionObserver extends AbstractObserver<SelectionData> {
-  private selectionHistory: SelectionData[] = []
-  
-  start(): void {
-    // 監聽文本選擇事件
-    // 分析選擇模式
-    // 記錄選擇歷史
-  }
-  
-  // 分析方法
-  getSelectionPatterns(): 'highlight' | 'copy' | 'research' | 'casual'
-  getInterestingQuotes(): string[]
-  getTopics(): string[]
-}
-```
-
-## 🤖 智能控制器
-
-### 1. 主控制器
-```typescript
-// src/controllers/IntelligentController.ts
-interface IntelligentControllerConfig {
-  foresightConfig: ForesightHookConfig
-  observerConfig: {
-    scroll: boolean
-    dwellTime: boolean
-    selection: boolean
-  }
-  analysisConfig: {
-    minConfidence: number
-    dataRetentionMs: number
-    batchSize: number
-  }
-}
-
-class IntelligentController {
-  private observers: Map<string, AbstractObserver> = new Map()
-  private dataCollector: DataCollector
-  private behaviorAnalyzer: BehaviorAnalyzer
-  private foresightHook: ReturnType<typeof useForesight>
-  
-  constructor(config: IntelligentControllerConfig)
-  
-  // 核心方法
-  initialize(): void
-  start(): void
-  stop(): void
-  
-  // 數據處理
-  processUserBehavior(data: any): void
-  analyzeBehaviorPattern(): BehaviorPattern
-  generateContext(): Context
-}
-```
-
-### 2. 行為分析器
-```typescript
-// src/services/BehaviorAnalyzer.ts
-interface BehaviorPattern {
-  readingStyle: 'deep' | 'scan' | 'search'
-  interests: string[]
-  attentionSpan: number
-  readingSpeed: number
-  interactionPreference: 'mouse' | 'keyboard' | 'mixed'
-  currentFocus: {
-    section: string
-    confidence: number
-    duration: number
-  }
-}
-
-class BehaviorAnalyzer {
-  // 行為模式分析
-  analyzeScrollPattern(scrollData: ScrollData[]): 'reading' | 'scanning'
-  analyzeDwellPattern(dwellData: DwellData[]): 'focused' | 'browsing'
-  analyzeSelectionPattern(selectionData: SelectionData[]): 'research' | 'casual'
-  
-  // 綜合分析
-  generateBehaviorProfile(allData: any[]): BehaviorPattern
-  predictNextAction(currentData: any): 'scroll' | 'select' | 'comment' | 'leave'
-  
-  // 相關性評分
-  calculateRelevanceScore(content: string, behavior: BehaviorPattern): number
-}
-```
-
-### 3. 數據收集器
-```typescript
-// src/services/DataCollector.ts
-interface Context {
-  // 用戶行為數據
-  behaviorPattern: BehaviorPattern
-  currentSession: {
-    startTime: number
-    duration: number
-    actionsCount: number
-    focusedSections: string[]
-  }
-  
-  // 內容數據
-  contentContext: {
-    currentPost: {
-      id: string
-      title: string
-      content: string
-      sections: string[]
-    }
-    readingProgress: number
-    highlightedText: string[]
-    selectedQuotes: string[]
-  }
-  
-  // 交互數據
-  interactionContext: {
-    mouseTrajectory: ForesightData[]
-    scrollPattern: ScrollData[]
-    dwellTimes: DwellData[]
-    selections: SelectionData[]
-  }
-  
-  // 環境數據
-  environmentContext: {
-    timestamp: number
-    deviceType: 'desktop' | 'tablet' | 'mobile'
-    screenSize: { width: number; height: number }
-    timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night'
-  }
-}
-
-class DataCollector {
-  private dataBuffer: any[] = []
-  private batchSize: number = 50
-  
-  // 數據收集
-  collect(data: any): void
-  flush(): Context
-  
-  // 數據處理
-  processRawData(rawData: any[]): Context
-  sanitizeData(data: any): any
-  
-  // 導出功能
-  exportForLLM(): string  // JSON 格式給 LLM
-  exportForAnalysis(): any  // 結構化數據
-}
-```
-
-## 🔧 ForesightJS 整合實作
-
-### 1. ForesightJS Hook
-```typescript
-// src/hooks/useForesight.ts
-import { useEffect, useRef } from 'react'
-
-interface UseForesightOptions {
-  threshold?: number
-  debounce?: number
-  onPrediction?: (data: ForesightData) => void
-  onHover?: (element: HTMLElement) => void
-  enabled?: boolean
-}
-
-export function useForesight(options: UseForesightOptions = {}) {
-  const foresightRef = useRef<any>(null)
-  
-  useEffect(() => {
-    // 初始化 ForesightJS
-    const foresight = new Foresight({
-      threshold: options.threshold || 0.5,
-      debounce: options.debounce || 100,
-    })
-    
-    // 設置事件監聽
-    foresight.on('prediction', options.onPrediction)
-    foresight.on('hover', options.onHover)
-    
-    foresightRef.current = foresight
-    
-    if (options.enabled !== false) {
-      foresight.start()
-    }
-    
-    return () => {
-      foresight.destroy()
-    }
-  }, [])
-  
-  return {
-    start: () => foresightRef.current?.start(),
-    stop: () => foresightRef.current?.stop(),
-    getMetrics: () => foresightRef.current?.getMetrics(),
-  }
-}
-```
-
-### 2. ForesightJS 數據處理
-```typescript
-// src/services/ForesightService.ts
-class ForesightService {
-  // 數據轉換
-  static transformForesightData(rawData: any): ForesightData {
-    // 將 ForesightJS 原始數據轉換為我們的格式
-  }
-  
-  // 預測分析
-  static analyzePrediction(data: ForesightData): {
-    isRelevant: boolean
-    actionType: string
-    confidence: number
-  }
-  
-  // 元素識別
-  static identifyElement(element: HTMLElement): {
-    type: 'text' | 'link' | 'button' | 'image' | 'other'
-    importance: number
-    content: string
-  }
-}
-```
-
-## 📊 智能觸發機制
-
-### 1. 條件判斷引擎
-```typescript
-// src/services/TriggerEngine.ts
-interface TriggerCondition {
-  type: 'scroll' | 'dwell' | 'selection' | 'prediction'
-  threshold: number
-  duration?: number
-  frequency?: number
-}
-
-interface TriggerRule {
-  id: string
-  name: string
-  conditions: TriggerCondition[]
-  action: string
-  priority: number
-  cooldown: number
-}
-
-class TriggerEngine {
-  private rules: TriggerRule[] = []
-  private lastTriggers: Map<string, number> = new Map()
-  
-  // 規則管理
-  addRule(rule: TriggerRule): void
-  removeRule(id: string): void
-  updateRule(id: string, updates: Partial<TriggerRule>): void
-  
-  // 觸發檢查
-  checkTriggers(data: any): TriggerRule[]
-  shouldTrigger(rule: TriggerRule, data: any): boolean
+interface QueueProcessor {
+  // 處理邏輯
+  process: () => Promise<void>
+  processMessage: (message: AIMessage) => Promise<void>
   
   // 頻率控制
-  isInCooldown(ruleId: string): boolean
-  updateCooldown(ruleId: string): void
+  setProcessingRate: (messagesPerSecond: number) => void
+  pause: () => void
+  resume: () => void
+  
+  // 批次處理
+  processBatch: (batchSize: number) => Promise<void>
 }
 ```
 
-### 2. 相關性評分系統
+### AI 訊息結構
 ```typescript
-// src/services/RelevanceScorer.ts
-interface RelevanceFactors {
-  dwellTime: number      // 停留時間
-  scrollSpeed: number    // 滾動速度
-  selectionCount: number // 選擇次數
-  mouseActivity: number  // 鼠標活動
-  readingProgress: number // 閱讀進度
-  contentType: string    // 內容類型
-}
-
-class RelevanceScorer {
-  // 評分計算
-  static calculateScore(factors: RelevanceFactors): number
+interface AIMessage {
+  // 基本資訊
+  id: string
+  type: 'suggestion' | 'recommendation' | 'reminder' | 'tip' | 'warning'
+  title: string
+  content: string
   
-  // 權重配置
-  static setWeights(weights: Partial<RelevanceFactors>): void
+  // 上下文整合
+  contextEvent: string        // 對應的 Context Event 名稱
+  contextName: string         // Context 名稱
+  payload: any               // 動態 payload
   
-  // 動態調整
-  static adjustScoreByContext(score: number, context: Context): number
+  // 動作按鈕
+  actionButton: {
+    label: string
+    action: () => Promise<void>
+    confirmRequired: boolean
+    destructive: boolean
+  }
   
-  // 閾值判斷
-  static isRelevant(score: number, threshold?: number): boolean
-}
-```
-
-## 📋 實作清單
-
-### Phase 3.1: Observer Pattern 基礎 👁️
-- [ ] 創建 `src/observers/` 目錄
-- [ ] 實作 `AbstractObserver` 基類
-- [ ] 實作 `ScrollObserver`
-- [ ] 實作 `DwellTimeObserver`
-- [ ] 實作 `SelectionObserver`
-
-### Phase 3.2: ForesightJS 整合 🎯
-- [ ] 安裝 ForesightJS 依賴
-- [ ] 實作 `useForesight` Hook
-- [ ] 創建 `ForesightService`
-- [ ] 整合到閱讀器頁面
-- [ ] 測試鼠標預測功能
-
-### Phase 3.3: 智能控制器核心 🧠
-- [ ] 實作 `IntelligentController`
-- [ ] 實作 `BehaviorAnalyzer`
-- [ ] 實作 `DataCollector`
-- [ ] 建立數據處理管道
-
-### Phase 3.4: 智能觸發系統 ⚡
-- [ ] 實作 `TriggerEngine`
-- [ ] 實作 `RelevanceScorer`
-- [ ] 配置觸發規則
-- [ ] 整合頻率控制
-
-### Phase 3.5: 數據導出和測試 📤
-- [ ] 實作 LLM 數據導出
-- [ ] 創建數據可視化工具
-- [ ] 性能優化和測試
-- [ ] 隱私和安全檢查
-
-## 🎯 技術重點
-
-### 1. ForesightJS 應用場景
-- **預測式內容加載** - 預測用戶要點擊的連結
-- **智能工具欄顯示** - 預測需要高亮或評論的文本
-- **上下文感知建議** - 根據鼠標軌跡提供相關建議
-- **閱讀流暢性優化** - 減少等待時間
-
-### 2. 數據隱私和性能
-- 本地數據處理，不上傳個人行為
-- 數據脫敏和匿名化
-- 內存使用優化
-- 批處理和防抖
-
-### 3. 行為模式識別
-- 深度閱讀 vs 快速瀏覽
-- 研究型 vs 休閒型閱讀
-- 重點關注區域識別
-- 用戶興趣推斷
-
-## 🔮 數據應用
-
-### 1. 給 Local LLM 的數據格式
-```json
-{
-  "session": {
-    "user_behavior": "深度閱讀模式，關注技術細節",
-    "reading_progress": 0.65,
-    "focus_areas": ["代碼範例", "架構圖"],
-    "interaction_style": "仔細選擇文本，停留時間長"
-  },
-  "content_context": {
-    "current_section": "React Hooks 實作",
-    "related_selections": ["useState", "useEffect"],
-    "difficulty_level": "intermediate"
-  },
-  "prediction_context": {
-    "likely_next_action": "查看相關文檔",
-    "interest_score": 0.85,
-    "suggested_topics": ["性能優化", "最佳實踐"]
+  // 優先級和時間
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  timestamp: number
+  expiresAt?: number
+  processingDelay?: number
+  
+  // 分類和標籤
+  category: string
+  tags: string[]
+  
+  // 元數據
+  metadata: {
+    confidence: number        // AI 建議信心度 (0-1)
+    relevanceScore: number    // 相關性分數 (0-1)
+    userContext: string       // 用戶當前情境描述
+    triggerEvent: string      // 觸發事件
+    expectedOutcome: string   // 預期結果
+  }
+  
+  // 追蹤資訊
+  tracking: {
+    shown: boolean
+    clicked: boolean
+    dismissed: boolean
+    shownAt?: number
+    clickedAt?: number
+    dismissedAt?: number
   }
 }
 ```
 
-### 2. LLM 整合接口
+## 🎨 Toast Queue UI 系統
+
+### Toast 組件架構
 ```typescript
-// src/services/LLMIntegration.ts
-interface LLMRequest {
-  context: Context
-  query?: string
-  type: 'suggestion' | 'explanation' | 'related_content'
+interface ToastQueue {
+  // 狀態管理
+  messages: ToastMessage[]
+  activeCount: number
+  maxVisible: number
+  
+  // 顯示控制
+  show: (message: AIMessage) => void
+  hide: (messageId: string) => void
+  hideAll: () => void
+  
+  // 佈局管理
+  reposition: () => void
+  calculatePositions: () => ToastPosition[]
+  
+  // 動畫控制
+  animateIn: (messageId: string) => Promise<void>
+  animateOut: (messageId: string) => Promise<void>
+  animateStack: () => Promise<void>
 }
 
-class LLMIntegration {
-  // 數據準備
-  static prepareContextForLLM(context: Context): string
+interface ToastMessage extends AIMessage {
+  // UI 狀態
+  isVisible: boolean
+  isExpanded: boolean
+  zIndex: number
   
-  // 查詢生成
-  static generateQuery(type: string, context: Context): string
+  // 動畫狀態
+  animationState: 'entering' | 'visible' | 'exiting'
+  animationProgress: number
   
-  // 結果處理
-  static processLLMResponse(response: string): any
+  // 用戶互動
+  hasBeenSeen: boolean
+  interactionCount: number
+  hoverTime: number
   
-  // 接口方法（為 Phase 4 準備）
-  static async queryLLM(request: LLMRequest): Promise<any>
-} 
+  // 佈局資訊
+  position: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
+  
+  // 樣式
+  theme: 'light' | 'dark' | 'auto'
+  variant: 'default' | 'info' | 'success' | 'warning' | 'error'
+}
+```
+
+### 佈局和動畫
+```typescript
+interface ToastLayoutManager {
+  // 位置計算
+  calculateStackPositions: (messages: ToastMessage[]) => ToastPosition[]
+  getOptimalPosition: (message: ToastMessage) => ToastPosition
+  checkCollision: (pos1: ToastPosition, pos2: ToastPosition) => boolean
+  
+  // 動畫管理
+  createEnterAnimation: (message: ToastMessage) => Animation
+  createExitAnimation: (message: ToastMessage) => Animation
+  createStackAnimation: (messages: ToastMessage[]) => Animation[]
+  
+  // 響應式處理
+  handleResize: () => void
+  updateViewport: (viewport: ViewportSize) => void
+}
+
+interface ToastPosition {
+  x: number
+  y: number
+  width: number
+  height: number
+  stackIndex: number
+  anchor: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+}
+```
+
+## 🔗 Context Event 整合
+
+### Event Registry
+```typescript
+interface ContextEventRegistry {
+  // 註冊 Context
+  registerContext: (name: string, context: any) => void
+  unregisterContext: (name: string) => void
+  
+  // 事件監聽
+  subscribeToEvent: (contextName: string, eventName: string, callback: Function) => void
+  unsubscribeFromEvent: (contextName: string, eventName: string, callback: Function) => void
+  
+  // 事件發射
+  emitEvent: (contextName: string, eventName: string, payload: any) => Promise<void>
+  
+  // 批次操作
+  subscribeToMultiple: (subscriptions: EventSubscription[]) => void
+  emitMultiple: (events: EventEmission[]) => Promise<void>
+  
+  // 查詢
+  getAvailableEvents: (contextName: string) => string[]
+  getSubscribers: (contextName: string, eventName: string) => Function[]
+}
+```
+
+### Context Actions 定義
+```typescript
+interface ContextActionDefinitions {
+  BehaviorContext: {
+    // 追蹤控制
+    startTracking: {
+      params: { postId: string }
+      returns: Promise<void>
+      description: "開始追蹤用戶行為"
+    }
+    stopTracking: {
+      params: {}
+      returns: Promise<void>
+      description: "停止追蹤用戶行為"
+    }
+    addEvent: {
+      params: { event: UserEvent }
+      returns: Promise<void>
+      description: "添加用戶事件"
+    }
+    executeSuggestion: {
+      params: { suggestion: Suggestion }
+      returns: Promise<void>
+      description: "執行 AI 建議"
+    }
+  }
+  
+  InteractionContext: {
+    // 互動操作
+    addInteraction: {
+      params: { interaction: PostInteraction }
+      returns: Promise<void>
+      description: "新增用戶互動"
+    }
+    highlightSection: {
+      params: { sectionId: string, note?: string }
+      returns: Promise<void>
+      description: "高亮文章段落"
+    }
+    addComment: {
+      params: { content: string, sectionId: string }
+      returns: Promise<void>
+      description: "添加評論"
+    }
+  }
+  
+  PostContext: {
+    // 導航控制
+    setCurrentPost: {
+      params: { post: Post }
+      returns: Promise<void>
+      description: "設置當前文章"
+    }
+    setSelectedTag: {
+      params: { tag: string | null }
+      returns: void
+      description: "選擇文章標籤"
+    }
+    recommendPost: {
+      params: { post: Post, reason: string }
+      returns: Promise<void>
+      description: "推薦相關文章"
+    }
+  }
+}
+```
+
+## 📈 效能監控和優化
+
+### 效能指標
+```typescript
+interface PerformanceMetrics {
+  // 連線效能
+  connectionLatency: number
+  reconnectionCount: number
+  connectionUptime: number
+  
+  // AI 回應效能
+  averageResponseTime: number
+  totalRequests: number
+  successfulRequests: number
+  failedRequests: number
+  
+  // 佇列效能
+  averageQueueSize: number
+  maxQueueSize: number
+  processedMessages: number
+  droppedMessages: number
+  
+  // UI 效能
+  toastRenderTime: number
+  animationFrameRate: number
+  memoryUsage: number
+  
+  // 用戶體驗指標
+  suggestionAcceptanceRate: number
+  averageInteractionTime: number
+  userSatisfactionScore: number
+}
+```
+
+### 優化策略
+```typescript
+interface OptimizationStrategies {
+  // 連線優化
+  connectionPooling: boolean
+  requestBatching: boolean
+  compressionEnabled: boolean
+  
+  // 佇列優化
+  queueCompression: boolean
+  messageDeduplication: boolean
+  priorityBasedProcessing: boolean
+  
+  // UI 優化
+  virtualizedToasts: boolean
+  animationOptimization: boolean
+  lazyRendering: boolean
+  
+  // 記憶體優化
+  messageGarbageCollection: boolean
+  contextDataCaching: boolean
+  automaticCleanup: boolean
+}
+```
+
+## 🔒 安全性和權限控制
+
+### 安全配置
+```typescript
+interface SecurityConfig {
+  // API 安全
+  apiKeyEncryption: boolean
+  requestSigning: boolean
+  rateLimiting: {
+    enabled: boolean
+    requestsPerMinute: number
+    burstLimit: number
+  }
+  
+  // 資料安全
+  dataEncryption: boolean
+  localStorageEncryption: boolean
+  sensitiveDataRedaction: boolean
+  
+  // 權限控制
+  contextPermissions: {
+    [contextName: string]: {
+      read: boolean
+      write: boolean
+      execute: boolean
+    }
+  }
+  
+  // 審計
+  auditLogging: boolean
+  actionTracking: boolean
+  errorReporting: boolean
+}
+```
+
+### 權限檢查
+```typescript
+interface PermissionChecker {
+  // Context 權限
+  canAccessContext: (contextName: string, action: string) => boolean
+  canExecuteAction: (contextName: string, actionName: string) => boolean
+  
+  // 資料權限
+  canReadData: (dataType: string) => boolean
+  canWriteData: (dataType: string) => boolean
+  
+  // UI 權限
+  canShowToast: (messageType: string) => boolean
+  canExecuteUIAction: (actionType: string) => boolean
+  
+  // 動態權限
+  requestPermission: (permission: string) => Promise<boolean>
+  revokePermission: (permission: string) => Promise<void>
+}
+```
+
+## 🧪 測試策略
+
+### 單元測試
+```typescript
+interface TestSuites {
+  // AI Agent 測試
+  aiAgentTests: {
+    connectionTests: Test[]
+    messageProcessingTests: Test[]
+    errorHandlingTests: Test[]
+  }
+  
+  // OpenRouter 整合測試
+  openRouterTests: {
+    apiIntegrationTests: Test[]
+    streamingTests: Test[]
+    authenticationTests: Test[]
+  }
+  
+  // 佇列系統測試
+  queueTests: {
+    messageQueueTests: Test[]
+    prioritizationTests: Test[]
+    concurrencyTests: Test[]
+  }
+  
+  // UI 組件測試
+  uiTests: {
+    toastComponentTests: Test[]
+    animationTests: Test[]
+    interactionTests: Test[]
+  }
+}
+```
+
+### 整合測試
+```typescript
+interface IntegrationTests {
+  // 端到端測試
+  e2eTests: {
+    userJourneyTests: Test[]
+    crossContextTests: Test[]
+    performanceTests: Test[]
+  }
+  
+  // 負載測試
+  loadTests: {
+    highVolumeMessageTests: Test[]
+    concurrentUserTests: Test[]
+    stressTests: Test[]
+  }
+  
+  // 兼容性測試
+  compatibilityTests: {
+    browserCompatibilityTests: Test[]
+    deviceCompatibilityTests: Test[]
+    versionCompatibilityTests: Test[]
+  }
+}
+```
+
+## 📚 實作指南
+
+### 開發流程
+1. **階段 1: 基礎建立**
+   - 創建 AIAgent Context
+   - 實作 OpenRouter 整合
+   - 建立基礎事件監聽
+
+2. **階段 2: 頻率測試**
+   - 部署事件監控
+   - 收集頻率數據
+   - 調整過濾規則
+
+3. **階段 3: UI 實作**
+   - 開發 Message Queue
+   - 實作 Toast UI
+   - 整合用戶交互
+
+4. **階段 4: 事件整合**
+   - 完善 Context 整合
+   - 實作動態 Actions
+   - 測試可執行性
+
+5. **階段 5: 成熟度驗證**
+   - 完整功能測試
+   - 性能優化
+   - 用戶體驗驗證
+
+### 最佳實踐
+- **漸進式開發：** 分階段實作，每階段都有明確目標
+- **測試驅動：** 先寫測試，再實作功能
+- **性能優先：** 從一開始就考慮性能優化
+- **用戶體驗：** 以用戶體驗為核心設計決策
+- **安全第一：** 每個功能都要考慮安全性影響
+
+---
+
+**文檔版本：** v2.0  
+**最後更新：** 2024年12月  
+**維護者：** AI Agent 開發團隊 
