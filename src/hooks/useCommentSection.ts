@@ -75,9 +75,25 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
     }, [controller, postId, isSubmitting])
 
     // 刪除評論
-    const deleteComment = useCallback(async (commentId: string): Promise<void> => {
-        await controller.deleteComment(commentId)
-    }, [controller])
+    const deleteComment = useCallback(async (commentId: string) => {
+        if (deletingIds.has(commentId)) return // 防止重複刪除
+
+        setDeletingIds(prev => new Set(prev).add(commentId))
+
+        try {
+            await controller.deleteComment(commentId)
+            // InteractionContext 會監聽事件並自動更新狀態
+            // useEffect 會監聽 allComments 變化並更新 popover
+        } catch (error) {
+            console.error('刪除評論失敗:', error)
+        } finally {
+            setDeletingIds(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(commentId)
+                return newSet
+            })
+        }
+    }, [controller, deletingIds])
 
     // 獲取特定段落的評論
     const getCommentsBySectionId = useCallback((sectionId: string): PostInteraction[] => {
@@ -162,27 +178,6 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
         }
     }, [allComments, showCommentPopover, hideCommentPopover])
 
-    // 處理評論刪除 (直接調用 controller)
-    const deleteCommentWithPopoverUpdate = useCallback(async (commentId: string) => {
-        if (deletingIds.has(commentId)) return // 防止重複刪除
-
-        setDeletingIds(prev => new Set(prev).add(commentId))
-
-        try {
-            await controller.deleteComment(commentId)
-            // InteractionContext 會監聽事件並自動更新狀態
-            // useEffect 會監聽 allComments 變化並更新 popover
-        } catch (error) {
-            console.error('刪除評論失敗:', error)
-        } finally {
-            setDeletingIds(prev => {
-                const newSet = new Set(prev)
-                newSet.delete(commentId)
-                return newSet
-            })
-        }
-    }, [controller, deletingIds])
-
     // 監聽評論變化，自動更新 popover
     useEffect(() => {
         if (popover.isVisible && popover.sectionId) {
@@ -211,7 +206,7 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
 
         // 操作
         addComment,
-        deleteComment: deleteCommentWithPopoverUpdate,
+        deleteComment,
         getCommentsBySectionId,
         hasComments,
 
