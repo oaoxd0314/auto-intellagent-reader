@@ -1,7 +1,7 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode, useRef, useCallback, useMemo } from 'react'
-import { BehaviorController, type SuggestionStrategy } from '@/controllers/BehaviorController'
+// 移除 BehaviorController 引用
+// import { BehaviorController, type SuggestionStrategy } from '@/controllers/BehaviorController'
 import type { Suggestion } from '@/types/suggestion'
-import type { UserEvent } from '@/types/behavior'
 
 // 節流函數
 function throttle<T extends (...args: any[]) => any>(func: T, delay: number): T {
@@ -24,49 +24,58 @@ function throttle<T extends (...args: any[]) => any>(func: T, delay: number): T 
   }) as T
 }
 
-// 狀態類型
+// 簡化的狀態類型 - 專注於事件收集
 interface BehaviorState {
-  isTracking: boolean
+  isCollecting: boolean
   currentPostId: string | null
-  suggestions: Suggestion[]
-  currentData: any
-  isLoading: boolean
+  controllerEvents: string[]  // Controller 事件日誌
+  sessionStart: number
+  lastEventTime: number
   error: string | null
 }
 
 // Action 類型
 type BehaviorAction =
-  | { type: 'SET_TRACKING'; payload: boolean }
-  | { type: 'SET_CURRENT_POST'; payload: string | null }
-  | { type: 'SET_SUGGESTIONS'; payload: Suggestion[] }
-  | { type: 'SET_CURRENT_DATA'; payload: any }
-  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'START_COLLECTING'; payload: string }
+  | { type: 'STOP_COLLECTING' }
+  | { type: 'ADD_EVENT'; payload: string }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'CLEAR_ERROR' }
 
 // 初始狀態
 const initialState: BehaviorState = {
-  isTracking: false,
+  isCollecting: false,
   currentPostId: null,
-  suggestions: [],
-  currentData: null,
-  isLoading: false,
+  controllerEvents: [],
+  sessionStart: Date.now(),
+  lastEventTime: 0,
   error: null,
 }
 
 // Reducer
 function behaviorReducer(state: BehaviorState, action: BehaviorAction): BehaviorState {
   switch (action.type) {
-    case 'SET_TRACKING':
-      return { ...state, isTracking: action.payload }
-    case 'SET_CURRENT_POST':
-      return { ...state, currentPostId: action.payload }
-    case 'SET_SUGGESTIONS':
-      return { ...state, suggestions: action.payload }
-    case 'SET_CURRENT_DATA':
-      return { ...state, currentData: action.payload }
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload }
+    case 'START_COLLECTING':
+      return { 
+        ...state, 
+        isCollecting: true, 
+        currentPostId: action.payload,
+        sessionStart: Date.now(),
+        controllerEvents: []
+      }
+    case 'STOP_COLLECTING':
+      return { 
+        ...state, 
+        isCollecting: false, 
+        currentPostId: null,
+        controllerEvents: []
+      }
+    case 'ADD_EVENT':
+      return { 
+        ...state, 
+        controllerEvents: [...state.controllerEvents.slice(-49), action.payload], // 保持最近50個事件
+        lastEventTime: Date.now()
+      }
     case 'SET_ERROR':
       return { ...state, error: action.payload }
     case 'CLEAR_ERROR':
@@ -76,17 +85,36 @@ function behaviorReducer(state: BehaviorState, action: BehaviorAction): Behavior
   }
 }
 
-// Context 類型
+// 用戶行為模式類型
+interface UserPattern {
+  type: 'scanning' | 'reading' | 'studying' | 'skimming'
+  confidence: number
+  duration: number
+  focus_areas: string[]
+}
+
+// Context 類型 - 簡化為事件收集器
 interface BehaviorContextType extends BehaviorState {
-  // Actions
-  startTracking: (postId: string) => Promise<void>
-  stopTracking: () => Promise<void>
-  addEvent: (event: Omit<UserEvent, 'timestamp'>) => Promise<void>
-  addStrategy: (strategy: SuggestionStrategy) => void
-  executeSuggestion: (suggestion: Suggestion) => Promise<void>
+  // 事件收集方法
+  startCollecting: (postId: string) => void
+  stopCollecting: () => void
+  collectEvent: (eventLog: string) => void
+  
+  // 數據分析方法
+  getUserPattern: () => UserPattern
+  getBehaviorData: () => {
+    recentEvents: string[]
+    userPattern: UserPattern
+    sessionData: {
+      sessionStart: number
+      duration: number
+      eventCount: number
+    }
+    timestamp: number
+  }
+  
+  // 錯誤處理
   clearError: () => void
-  // Utilities
-  getCurrentData: () => any
 }
 
 // Context
@@ -97,188 +125,107 @@ interface BehaviorProviderProps {
   children: ReactNode
 }
 
-// Provider Component
+// Provider Component - 簡化為事件收集器
 export function BehaviorProvider({ children }: BehaviorProviderProps) {
   const [state, dispatch] = useReducer(behaviorReducer, initialState)
-  const controllerRef = useRef<BehaviorController | null>(null)
   const isUnmountedRef = useRef(false)
   
-  // 節流的調度函數 - 減少狀態更新頻率
+  // 節流的調度函數
   const throttledDispatch = useMemo(() => throttle((action: BehaviorAction) => {
     if (!isUnmountedRef.current) {
       dispatch(action)
     }
-  }, 100), []) // 100ms 節流
-  
-  // 節流的數據更新函數
-  const throttledDataUpdate = useMemo(() => throttle(() => {
-    if (controllerRef.current && !isUnmountedRef.current) {
-      const currentData = controllerRef.current.getCurrentData()
-      throttledDispatch({ type: 'SET_CURRENT_DATA', payload: currentData })
-    }
-  }, 500), [throttledDispatch]) // 500ms 節流數據更新
+  }, 100), [])
 
-  // 初始化控制器
+  // 清理函數
   useEffect(() => {
-    if (!controllerRef.current) {
-      controllerRef.current = new BehaviorController()
-      controllerRef.current.initialize()
-
-      // 監聽控制器事件 - 使用節流
-      const handleSuggestionsGenerated = throttle((suggestions: Suggestion[]) => {
-        if (!isUnmountedRef.current) {
-          throttledDispatch({ type: 'SET_SUGGESTIONS', payload: suggestions })
-        }
-      }, 200) // 200ms 節流建議更新
-
-      const handleTrackingStarted = (postId: string) => {
-        if (!isUnmountedRef.current) {
-          throttledDispatch({ type: 'SET_TRACKING', payload: true })
-          throttledDispatch({ type: 'SET_CURRENT_POST', payload: postId })
-        }
-      }
-
-      const handleTrackingStopped = () => {
-        if (!isUnmountedRef.current) {
-          throttledDispatch({ type: 'SET_TRACKING', payload: false })
-          throttledDispatch({ type: 'SET_CURRENT_POST', payload: null })
-        }
-      }
-
-      const handleError = (error: Error) => {
-        if (!isUnmountedRef.current) {
-          throttledDispatch({ type: 'SET_ERROR', payload: error.message })
-        }
-      }
-
-      controllerRef.current.on('suggestionsGenerated', handleSuggestionsGenerated)
-      controllerRef.current.on('trackingStarted', handleTrackingStarted)
-      controllerRef.current.on('trackingStopped', handleTrackingStopped)
-      controllerRef.current.on('error', handleError)
-    }
-
     return () => {
       isUnmountedRef.current = true
-      
-      // 清理定時器
-      if (controllerRef.current && !controllerRef.current.getState().isDestroyed) {
-        // 異步清理，避免阻塞
-        Promise.resolve().then(async () => {
-          try {
-            await controllerRef.current?.stopTracking()
-            controllerRef.current?.destroy()
-          } catch (error) {
-            console.error('Error during cleanup:', error)
-          }
-        })
-      }
     }
-  }, [throttledDispatch])
-
-  // 開始追蹤
-  const startTracking = useCallback(async (postId: string): Promise<void> => {
-    if (!controllerRef.current) return
-
-    throttledDispatch({ type: 'SET_LOADING', payload: true })
-    throttledDispatch({ type: 'CLEAR_ERROR' })
-
-    try {
-      await controllerRef.current.startTracking(postId)
-    } catch (error) {
-      throttledDispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : '開始追蹤失敗' 
-      })
-    } finally {
-      throttledDispatch({ type: 'SET_LOADING', payload: false })
-    }
-  }, [throttledDispatch])
-
-  // 停止追蹤
-  const stopTracking = useCallback(async (): Promise<void> => {
-    if (!controllerRef.current) return
-
-    throttledDispatch({ type: 'SET_LOADING', payload: true })
-
-    try {
-      await controllerRef.current.stopTracking()
-      throttledDispatch({ type: 'SET_SUGGESTIONS', payload: [] })
-      throttledDispatch({ type: 'SET_CURRENT_DATA', payload: null })
-    } catch (error) {
-      throttledDispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : '停止追蹤失敗' 
-      })
-    } finally {
-      throttledDispatch({ type: 'SET_LOADING', payload: false })
-    }
-  }, [throttledDispatch])
-
-  // 添加事件 - 使用節流減少頻率
-  const addEvent = useCallback(async (event: Omit<UserEvent, 'timestamp'>): Promise<void> => {
-    if (!controllerRef.current) return
-
-    try {
-      await controllerRef.current.addEvent(event)
-      // 使用節流的數據更新
-      throttledDataUpdate()
-    } catch (error) {
-      throttledDispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : '添加事件失敗' 
-      })
-    }
-  }, [throttledDispatch, throttledDataUpdate])
-
-  // 添加策略
-  const addStrategy = useCallback((strategy: SuggestionStrategy): void => {
-    if (!controllerRef.current) return
-    controllerRef.current.addStrategy(strategy)
   }, [])
 
-  // 執行建議
-  const executeSuggestion = useCallback(async (suggestion: Suggestion): Promise<void> => {
-    try {
-      await suggestion.action()
-      // 移除已執行的建議
-      const newSuggestions = state.suggestions.filter(s => s.id !== suggestion.id)
-      throttledDispatch({ type: 'SET_SUGGESTIONS', payload: newSuggestions })
-    } catch (error) {
-      throttledDispatch({ 
-        type: 'SET_ERROR', 
-        payload: error instanceof Error ? error.message : '執行建議失敗' 
-      })
+  // 開始收集事件
+  const startCollecting = useCallback((postId: string): void => {
+    throttledDispatch({ type: 'START_COLLECTING', payload: postId })
+  }, [throttledDispatch])
+
+  // 停止收集事件
+  const stopCollecting = useCallback((): void => {
+    throttledDispatch({ type: 'STOP_COLLECTING' })
+  }, [throttledDispatch])
+
+  // 收集 Controller 事件日誌
+  const collectEvent = useCallback((eventLog: string): void => {
+    if (state.isCollecting) {
+      throttledDispatch({ type: 'ADD_EVENT', payload: eventLog })
     }
-  }, [state.suggestions, throttledDispatch])
+  }, [state.isCollecting, throttledDispatch])
+
+  // 分析用戶模式
+  const getUserPattern = useCallback((): UserPattern => {
+    const { controllerEvents, sessionStart } = state
+    const duration = Date.now() - sessionStart
+    
+    // 簡單的模式分析邏輯
+    const eventCount = controllerEvents.length
+    const avgEventInterval = duration / Math.max(eventCount, 1)
+    
+    let type: UserPattern['type'] = 'reading'
+    let confidence = 0.5
+    
+    if (avgEventInterval < 1000) {
+      type = 'scanning'
+      confidence = 0.8
+    } else if (avgEventInterval > 5000) {
+      type = 'studying'
+      confidence = 0.7
+    }
+    
+    return {
+      type,
+      confidence,
+      duration,
+      focus_areas: extractFocusAreas(controllerEvents)
+    }
+  }, [state])
+
+  // 獲取完整行為數據
+  const getBehaviorData = useCallback(() => {
+    const userPattern = getUserPattern()
+    
+    return {
+      recentEvents: [...state.controllerEvents],
+      userPattern,
+      sessionData: {
+        sessionStart: state.sessionStart,
+        duration: Date.now() - state.sessionStart,
+        eventCount: state.controllerEvents.length
+      },
+      timestamp: Date.now()
+    }
+  }, [state, getUserPattern])
 
   // 清除錯誤
   const clearError = useCallback((): void => {
     throttledDispatch({ type: 'CLEAR_ERROR' })
   }, [throttledDispatch])
 
-  // 獲取當前數據
-  const getCurrentData = useCallback((): any => {
-    return controllerRef.current?.getCurrentData() || null
-  }, [])
-
   const contextValue: BehaviorContextType = useMemo(() => ({
     ...state,
-    startTracking,
-    stopTracking,
-    addEvent,
-    addStrategy,
-    executeSuggestion,
+    startCollecting,
+    stopCollecting,
+    collectEvent,
+    getUserPattern,
+    getBehaviorData,
     clearError,
-    getCurrentData,
   }), [
     state,
-    startTracking,
-    stopTracking,
-    addEvent,
-    addStrategy,
-    executeSuggestion,
-    clearError,
-    getCurrentData
+    startCollecting,
+    stopCollecting,
+    collectEvent,
+    getUserPattern,
+    getBehaviorData,
+    clearError
   ])
 
   return (
@@ -286,6 +233,19 @@ export function BehaviorProvider({ children }: BehaviorProviderProps) {
       {children}
     </BehaviorContext.Provider>
   )
+}
+
+// 輔助函數：從事件日誌中提取焦點區域
+function extractFocusAreas(events: string[]): string[] {
+  const focusAreas: string[] = []
+  
+  events.forEach(event => {
+    if (event.includes('Post')) focusAreas.push('content')
+    if (event.includes('Interaction')) focusAreas.push('interaction')
+    if (event.includes('Navigation')) focusAreas.push('navigation')
+  })
+  
+  return [...new Set(focusAreas)] // 去重
 }
 
 // Custom Hook
