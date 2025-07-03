@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { usePost } from '@/contexts/PostContext'
+import { SimpleChat } from '@/components/SimpleChat'
 
 export default function HomePage() {
   const { posts, isPostsLoading, tags } = usePost()
@@ -165,6 +166,13 @@ export default function HomePage() {
           </Card>
         </div>
       </div>
+
+      {/* AI 聊天測試區塊 */}
+      <div className="container mx-auto mt-12">
+        <SimpleChat />
+      </div>
     </div>
   )
-} 
+}
+
+ 
