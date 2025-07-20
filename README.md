@@ -20,29 +20,36 @@
 | 路由系統 | ✅ 完成 | 100% |
 | UI 組件 | ✅ 完成 | 100% |
 | Markdown 解析 | ✅ 完成 | 100% |
-| 分層架構 | ✅ 完成 | 100% |
-| 控制器系統 | ✅ 完成 | 80% |
+| Event-Driven 架構 | ✅ 完成 | 100% |
+| Controller 系統 | ✅ 完成 | 95% |
+| Action Handler 模式 | ✅ 完成 | 100% |
 | 行為追蹤 | 🚧 開發中 | 60% |
-| AI 建議系統 | 🚧 開發中 | 30% |
+| AI Agent 準備 | ✅ 完成 | 90% |
 
 ---
 
 ## 🏗️ 系統架構
 
-### 分層架構
+### Event-Driven Action Handler 架構
 ```
-UI Components → Context → Controller → Service
-     ↑            ↓         ↓           ↓
-   Render    State Mgmt  Business   Data Layer
-   Update    & Events    Logic      Operations
+Hook Layer ↔ Controller Layer ↔ Services Layer
+     ↓             ↓                ↓
+UI 狀態管理    純 Action Handler   數據 + 緩存 + 業務邏輯
+事件監聽      Command Pattern     持久化 + 搜索 + 推薦
+executeAction  Event Emitter      完整 Data Layer
 ```
 
-### 事件驅動流程
+### AI Agent 準備架構
 ```
-User Events → Context → Controller → AI Strategies → UI Render
-     ↓           ↓          ↓            ↓           ↓
-  滾動/懸停   React狀態   業務邏輯    建議生成    動態展示
-  選擇/停留   事件處理   流程控制    策略選擇    用戶反饋
+AI Agent → SuperController → ControllerRegistry → xxxController
+   ↓            ↓                ↓                    ↓
+string cmd   Command Pattern   22 Actions         Event-Driven
+"ADD_TASK"   Action Parsing    Action Discovery   State Updates
+```
+
+### 統一 Action 調用
+```
+Hook/Context → executeAction(controller, action, payload) → Events → State Update
 ```
 
 ## 🚀 快速開始
@@ -72,13 +79,27 @@ pnpm dev
 
 ## 🎯 下一步
 
-**當前階段: Background AI Agent 基礎建立** 🚀
-- [ ] 創建 AIAgent Context
-- [ ] OpenRouter API 整合
-- [ ] 基礎事件監聽
-- [ ] 數據流測試
+**當前階段: AI Agent SuperController 實現** 🚀
 
-詳細開發計劃請參考 [功能規格總覽](./doc/spec/features.md)
+### ✅ 已完成 (重構階段)
+- ✅ Event-Driven Action Handler 架構
+- ✅ ControllerRegistry 統一管理 (22 Actions)
+- ✅ Command Pattern 基礎建立
+- ✅ 所有 Controller 轉換為純 Action Handler
+
+### 🚧 技術債務待處理
+- [ ] 修復 Controller Registry 初始化時序問題 (FIXME)
+- [ ] 改善 executeAction 返回類型推斷 (TODO)
+
+### 🚀 下一個里程碑: SuperController
+- [ ] 創建 SuperController 類
+- [ ] 實現 AI Agent string command parsing
+- [ ] 建立 Action 執行策略 (direct/toast)
+- [ ] 整合 OpenRouter API
+
+詳細計劃請參考:
+- [Controller 重構狀態](./doc/dev/refactor/controller-refactor-todo.md)
+- [功能規格總覽](./doc/spec/features.md)
 
 ---
 
