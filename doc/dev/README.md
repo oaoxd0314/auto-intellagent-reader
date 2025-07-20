@@ -1,35 +1,105 @@
-# 🚀 Controller-Facade 簡化架構開發指南
+# 🛠️ 開發文檔總覽
+
+> 本目錄包含所有技術架構、開發指南和實作細節的文檔。
+
+## 📚 文檔結構概覽
+
+### 🏗️ **架構設計**
+- **[architecture.md](./architecture.md)** - AI Agent 統一架構設計
+- **[ai-agent-guide.md](./ai-agent-guide.md)** - AI Agent Command Pattern 實作指南
+- **[state-flow.md](./state-flow.md)** - 資料流和狀態管理
+
+### 💻 **開發指南**
+- **[coding-standards.md](./coding-standards.md)** - 程式碼規範和最佳實踐
+- **[project-structure.md](./project-structure.md)** - 專案目錄結構說明
+
+---
 
 ## 🎯 架構核心理念
 
-### **「UI 只與 Hook 交互」**
-UI 組件完全不需要了解業務邏輯的實現細節，所有複雜性都被封裝在 Hook 內部。
+## 🎯 架構核心理念
 
-### **「Controller 是真正的髒地方」**
-Controller 承擔所有業務邏輯協調，是真正的 Facade Pattern 實現。
+### **「AI Agent + 傳統 UI 雙重支援」**
+- **AI Agent**: 透過字串指令動態調用業務邏輯
+- **傳統 UI**: UI 組件透過 Hook 調用 Controller
+- **統一接口**: 兩種方式都通過 Controller Facade 執行
+
+### **「Command Pattern 為核心」**
+- **AgentCommand**: 將 AI 指令封裝為可執行物件
+- **SuperController**: 解析指令、管理佇列、選擇執行策略
+- **ApplyPolicy**: 支援直接執行或人工確認
 
 ### **「每層職責單一且明確」**
+- **AI Agent**: 生成字串指令
+- **SuperController**: 指令解析和執行協調
+- **Controller Facade**: 統一業務邏輯接口
 - **Hook**: UI 狀態管理 + Controller 調用
-- **Controller**: 業務邏輯協調 (Facade)
 - **Context**: 純狀態管理
 - **Factory**: 物件創建和轉換
 - **Services**: 純數據 CRUD
 
-## 🏗️ 簡化架構概覽
+## 🏗️ 統一架構概覽
 
 ```
-UI Components ← → Hook (唯一交互層)
-                  ↓
-              Controller (業務邏輯)
-                  ↓
-          Context/Factory/Services
+AI Agent (字串指令) ←→ SuperController ←→ Controller Facade
+                                              ↑
+UI Components ←→ Hook (UI 交互層) ←→ Controller ←┘
+                                              ↓
+                                    Context/Factory/Services
 ```
 
-此架構專為靜態文件場景優化，提供最佳的開發體驗和維護性。
+### 雙重執行路徑
+1. **AI Agent 路徑**: `AI Agent → SuperController → Controller Facade → xxxController`
+2. **傳統 UI 路徑**: `UI → Hook → Controller → Context/Service`
+3. **統一後端**: 兩種路徑最終都調用相同的業務邏輯
+
+此架構同時支援 AI 動態控制和傳統 UI 互動，保持最佳的開發體驗。
 
 ## 🛠️ 開發工作流
 
-### 1. **新增 UI 功能**
+### 1. **新增 AI Agent 指令**
+
+#### Step 1: 定義 AgentCommand
+```typescript
+// src/commands/AddTaskCommand.ts
+class AddTaskCommand implements AgentCommand {
+  constructor(private payload: { title: string; description?: string }) {}
+  
+  get type(): string { return 'ADD_TASK' }
+  
+  toHumanReadable(): string {
+    return `新增任務: ${this.payload.title}`
+  }
+  
+  async apply(policy: ApplyPolicy): Promise<void> {
+    const execute = async () => {
+      const controller = getTaskController()
+      await controller.addTask(this.payload)
+    }
+    
+    await policy(this, execute)
+  }
+}
+```
+
+#### Step 2: 註冊到 CommandFactory
+```typescript
+// src/lib/CommandFactory.ts
+const commandTable: Record<string, (args: string[]) => AgentCommand> = {
+  ADD_TASK: (args) => new AddTaskCommand(parseTaskArgs(args)),
+  DELETE_TASK: (args) => new DeleteTaskCommand(parseTaskArgs(args)),
+  // ... 其他指令
+}
+```
+
+#### Step 3: 測試 AI Agent 指令
+```typescript
+// 使用方式
+const superController = new SuperController(directApplyPolicy)
+superController.enqueue('ADD_TASK title="買牛奶" description="去超市買有機牛奶"')
+```
+
+### 2. **新增 UI 功能**
 
 #### Step 1: 創建 Hook
 ```typescript
@@ -100,7 +170,7 @@ class PostController {
 }
 ```
 
-### 2. **新增業務邏輯**
+### 3. **新增業務邏輯 (AI + UI 共用)**
 
 #### 在 Controller 中實現複雜的業務邏輯協調：
 ```typescript
@@ -138,7 +208,7 @@ async addCommentWithNotification(postId: string, content: string): Promise<Comme
 }
 ```
 
-### 3. **新增數據類型**
+### 4. **新增數據類型**
 
 #### Step 1: 定義類型
 ```typescript
@@ -208,7 +278,7 @@ class NewEntityService {
 }
 ```
 
-### 4. **新增 Context 狀態**
+### 5. **新增 Context 狀態**
 
 #### 只負責純狀態管理，不包含業務邏輯：
 ```typescript
@@ -257,6 +327,10 @@ function NewEntityProvider({ children }: { children: React.ReactNode }) {
 ### **核心目錄**
 ```
 src/
+├── ai-agent/        # AI Agent 相關
+│   ├── commands/    # AgentCommand 實現
+│   ├── policies/    # ApplyPolicy 實現
+│   └── SuperController.ts
 ├── hooks/           # UI 交互層 - Hook 實現
 ├── controllers/     # 業務邏輯層 - Controller 實現  
 ├── contexts/        # 狀態管理層 - Context 實現
@@ -264,6 +338,21 @@ src/
 ├── services/       # 數據層 - Service 實現
 ├── types/          # 類型定義
 └── components/     # UI 組件
+```
+
+### **AI Agent 目錄組織**
+```
+ai-agent/
+├── commands/
+│   ├── AddTaskCommand.ts
+│   ├── DeleteTaskCommand.ts
+│   └── UpdateTaskCommand.ts
+├── policies/
+│   ├── DirectApplyPolicy.ts
+│   ├── ToastPolicy.ts
+│   └── index.ts
+├── SuperController.ts
+└── CommandFactory.ts
 ```
 
 ### **Hook 目錄組織**
@@ -285,6 +374,100 @@ controllers/
 ```
 
 ## 🔧 開發規範
+
+### **AgentCommand 設計原則**
+1. **單一職責** - 每個 Command 只負責一個特定操作
+2. **人類可讀** - 提供清晰的 `toHumanReadable()` 描述
+3. **可復原** - 重要操作應提供 `undo()` 方法
+4. **策略無關** - 不關心如何執行，只關心做什麼
+
+```typescript
+// ✅ 好的 AgentCommand 設計
+class UpdatePostCommand implements AgentCommand {
+  constructor(private postId: string, private updates: PostUpdateData) {}
+  
+  get type(): string { return 'UPDATE_POST' }
+  
+  toHumanReadable(): string {
+    return `更新文章 "${this.updates.title || this.postId}"`
+  }
+  
+  async apply(policy: ApplyPolicy): Promise<void> {
+    const execute = async () => {
+      const facade = getPostFacade()
+      await facade.updatePost(this.postId, this.updates)
+    }
+    
+    await policy(this, execute)
+  }
+  
+  async undo(): Promise<void> {
+    const facade = getPostFacade()
+    await facade.revertPost(this.postId)
+  }
+}
+
+// ❌ 避免：Command 包含執行策略
+class BadCommand implements AgentCommand {
+  async apply(): Promise<void> {
+    // ❌ 不應該在 Command 中決定執行策略
+    if (this.needsConfirmation) {
+      await this.showConfirmDialog()
+    }
+    await this.execute()
+  }
+}
+```
+
+### **SuperController 設計原則**
+1. **佇列管理** - 維護指令執行佇列
+2. **策略選擇** - 根據指令類型選擇合適的 ApplyPolicy
+3. **錯誤處理** - 統一處理指令解析和執行錯誤
+4. **審計日誌** - 記錄所有指令執行歷史
+
+```typescript
+// ✅ 好的 SuperController 設計
+class SuperController {
+  private queue: AgentCommand[] = []
+  private history: CommandHistory[] = []
+  
+  constructor(private defaultPolicy: ApplyPolicy) {}
+  
+  enqueue(rawCommand: string): void {
+    try {
+      const command = CommandFactory.fromString(rawCommand)
+      this.queue.push(command)
+      this.processQueue()
+    } catch (error) {
+      this.handleParseError(error, rawCommand)
+    }
+  }
+  
+  private async processQueue(): Promise<void> {
+    const command = this.queue.shift()
+    if (!command) return
+    
+    const policy = this.selectPolicy(command)
+    
+    try {
+      await command.apply(policy)
+      this.recordSuccess(command)
+    } catch (error) {
+      this.recordFailure(command, error)
+    }
+    
+    this.processQueue() // 繼續處理下一個
+  }
+  
+  private selectPolicy(command: AgentCommand): ApplyPolicy {
+    // 根據指令類型選擇策略
+    if (command.type.includes('DELETE')) {
+      return toastPolicy // 刪除操作需要確認
+    }
+    return this.defaultPolicy
+  }
+}
+```
 
 ### **Hook 設計原則**
 1. **單一功能職責** - 每個 Hook 專注於一個特定功能
@@ -399,6 +582,58 @@ interface BadContextType {
 
 ## 🧪 測試策略
 
+### **AgentCommand 測試**
+測試指令解析、執行和人類可讀描述：
+```typescript
+describe('AddTaskCommand', () => {
+  it('should execute task creation correctly', async () => {
+    const mockFacade = { addTask: jest.fn().mockResolvedValue(mockTask) }
+    const command = new AddTaskCommand({ title: 'Test Task' })
+    
+    const mockPolicy: ApplyPolicy = async (cmd, execute) => {
+      await execute()
+    }
+    
+    await command.apply(mockPolicy)
+    
+    expect(mockFacade.addTask).toHaveBeenCalledWith({ title: 'Test Task' })
+  })
+  
+  it('should provide human readable description', () => {
+    const command = new AddTaskCommand({ title: 'Buy milk' })
+    expect(command.toHumanReadable()).toBe('新增任務: Buy milk')
+  })
+})
+```
+
+### **SuperController 測試**
+測試指令佇列管理和策略選擇：
+```typescript
+describe('SuperController', () => {
+  it('should process commands in queue order', async () => {
+    const mockPolicy = jest.fn().mockImplementation(async (cmd, exec) => exec())
+    const controller = new SuperController(mockPolicy)
+    
+    controller.enqueue('ADD_TASK title="First"')
+    controller.enqueue('ADD_TASK title="Second"')
+    
+    await waitFor(() => {
+      expect(mockPolicy).toHaveBeenCalledTimes(2)
+    })
+  })
+  
+  it('should select appropriate policy for different commands', () => {
+    const controller = new SuperController(directApplyPolicy)
+    
+    // 刪除操作應該使用 Toast 策略
+    const deleteCommand = new DeleteTaskCommand({ id: '123' })
+    const policy = controller.selectPolicy(deleteCommand)
+    
+    expect(policy).toBe(toastPolicy)
+  })
+})
+```
+
 ### **Hook 測試**
 測試 Hook 的 UI 交互邏輯和 Controller 調用：
 ```typescript
@@ -446,7 +681,7 @@ describe('FeatureController', () => {
 
 ## 🚀 快速開始
 
-### 1. **創建新功能的完整流程**
+### 1. **創建新功能的完整流程 (AI Agent + UI 支援)**
 
 ```bash
 # 1. 創建類型定義
@@ -464,30 +699,50 @@ touch src/contexts/NewFeatureContext.tsx
 # 5. 在 Controller 中添加業務邏輯
 # 編輯 src/controllers/相關Controller.ts
 
-# 6. 創建 Hook
+# 6. 創建 AI Agent Command
+touch src/ai-agent/commands/NewFeatureCommand.ts
+
+# 7. 註冊到 CommandFactory
+# 編輯 src/ai-agent/CommandFactory.ts
+
+# 8. 創建 Hook (UI 支援)
 touch src/hooks/useNewFeature.ts
 
-# 7. 在 UI 中使用
+# 9. 在 UI 中使用
 # 編輯相關組件文件
 ```
 
 ### 2. **開發檢查清單**
 
+#### AI Agent 支援
+- [ ] 每個重要操作都有對應的 AgentCommand
+- [ ] Command 提供清晰的 `toHumanReadable()` 描述
+- [ ] 危險操作使用 ToastPolicy 需要確認
+- [ ] SuperController 正確解析和執行指令
+- [ ] Command 可以通過 Controller Facade 調用業務邏輯
+
+#### 傳統 UI 支援
 - [ ] UI 組件只調用 Hook，不直接使用 Controller/Context/Service
 - [ ] Hook 封裝了所有複雜性，提供簡潔的接口
 - [ ] Controller 承擔所有業務邏輯協調
 - [ ] Context 只管理狀態，不包含業務邏輯
 - [ ] Factory 專注於物件創建和轉換
 - [ ] Service 只處理純數據 CRUD
+
+#### 統一要求
+- [ ] AI Agent 和 UI 都通過相同的 Controller 執行邏輯
 - [ ] 每層都有清晰的測試覆蓋
+- [ ] 錯誤處理統一且完善
 
 ## 📚 相關文檔
 
-- [**架構設計詳解**](./architecture.md) - 深入了解架構設計模式和實現細節
+- [**架構設計詳解**](./architecture.md) - 深入了解 AI Agent 架構設計模式和實現細節
+- [**AI Agent 實作指南**](./ai-agent-guide.md) - Command Pattern 的具體實作方法
 - [**狀態流管理**](./state-flow.md) - 了解數據流和狀態管理機制
-- [**目錄結構說明**](./folder-structure.md) - 詳細的目錄組織和文件職責
-- [**開發指南**](./development.md) - 具體的開發規範和最佳實踐
+- [**專案結構說明**](./project-structure.md) - 詳細的目錄組織和文件職責
+- [**程式碼規範**](./coding-standards.md) - 具體的開發規範和最佳實踐
+- [**功能規格文檔**](../spec/README.md) - 功能需求和業務邏輯規格
 
 ---
 
-💡 **記住**: UI 只與 Hook 交互，Controller 作為真正的 Facade 協調所有業務邏輯。這個簡化架構讓開發更直觀、維護更容易！ 
+💡 **記住**: AI Agent 和 UI 都通過統一的 Controller Facade 執行業務邏輯。這個架構同時支援 AI 動態控制和傳統 UI 互動，讓開發更靈活、維護更容易！ 
