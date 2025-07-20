@@ -147,18 +147,26 @@ interface AgentCommand {
 
 ## Important Notes
 
-- **Project is in active refactor** - AI Agent integration is the current focus
-- The new architecture coexists with legacy Controller-Facade pattern
-- All AI Agent commands go through SuperController for safety and audit
+- **✅ Architecture refactor COMPLETED** - Event-Driven Action Handler architecture fully implemented
+- **✅ Controller system COMPLETED** - All controllers converted to pure Action Handlers with executeAction interface
+- **✅ ControllerRegistry COMPLETED** - 22 Actions available across 3 Controllers
+- All AI Agent commands will go through SuperController for safety and audit
 - MDX content management remains in `src/content/posts/`
 - Follow the Command Pattern for new AI Agent features
 - Use ApplyPolicy for user confirmation on critical operations
 
 ## Current Development Status
 
-- ✅ Basic architecture established
-- ✅ Controller system implemented (80%)
-- 🚧 AI Agent system (30% - under active development)
+- ✅ Event-Driven Action Handler architecture (100% - COMPLETED)
+- ✅ Controller system refactored to pure Action Handlers (100% - COMPLETED)
+- ✅ ControllerRegistry and unified executeAction interface (100% - COMPLETED)
+- ✅ 22 Actions available across 3 Controllers (100% - COMPLETED)
+- ✅ AI Agent SuperController system (100% - COMPLETED)
+  - ✅ AgentCommand interface and concrete implementations
+  - ✅ SuperController with command parsing and execution
+  - ✅ ApplyPolicy strategy system (Direct/Toast/Smart)
+  - ✅ Complete integration with ControllerRegistry
 - 🚧 Behavior tracking (60%)
+- 🚧 Toast UI for user confirmations (0% - next priority)
 
 For detailed AI Agent architecture, refer to `doc/spec/ai-controller/new.md`.
