@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react'
 import { useInteraction } from '../contexts/InteractionContext'
-import { InteractionController } from '../controllers/InteractionController'
+import { useControllerRegistry } from './useControllerRegistry'
 // import type { PostInteraction } from '../types/post' // 暫時移除未使用的導入
 
 /**
@@ -9,10 +9,9 @@ import { InteractionController } from '../controllers/InteractionController'
  */
 export function useReplyPost(postId: string) {
     const { getInteractionsByType } = useInteraction()
+    const { executeAction } = useControllerRegistry()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
-
-    const controller = useMemo(() => InteractionController.getInstance(), [])
 
     const replies = useMemo(
         () => {
@@ -29,7 +28,10 @@ export function useReplyPost(postId: string) {
         setSubmitError(null)
 
         try {
-            await controller.addReply(postId, content)
+            await executeAction('InteractionController', 'ADD_REPLY', {
+                postId,
+                content
+            })
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to add reply'
             setSubmitError(errorMessage)
@@ -37,25 +39,30 @@ export function useReplyPost(postId: string) {
         } finally {
             setIsSubmitting(false)
         }
-    }, [controller, postId]) // 移除 isSubmitting 依賴
+    }, [executeAction, postId]) // 移除 isSubmitting 依賴
 
     // 刪除回覆
     const deleteReply = useCallback(async (replyId: string): Promise<void> => {
         try {
-            await controller.deleteReply(replyId)
+            await executeAction('InteractionController', 'REMOVE_INTERACTION', {
+                interactionId: replyId
+            })
         } catch (error) {
             throw error
         }
-    }, [controller])
+    }, [executeAction])
 
     // 編輯回覆
     const editReply = useCallback(async (replyId: string, content: string): Promise<void> => {
         try {
-            await controller.editReply(replyId, content)
+            await executeAction('InteractionController', 'EDIT_REPLY', {
+                replyId,
+                content
+            })
         } catch (error) {
             throw error
         }
-    }, [controller])
+    }, [executeAction])
 
     const canSubmit = useCallback(() => !isSubmitting, [isSubmitting])
 

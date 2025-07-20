@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useInteraction } from '../contexts/InteractionContext'
-import { InteractionController } from '../controllers/InteractionController'
+import { useControllerRegistry } from './useControllerRegistry'
 import type { PostInteraction } from '../types/post'
 
 /**
@@ -9,11 +9,9 @@ import type { PostInteraction } from '../types/post'
  */
 export function useMarkSection(postId: string) {
     const { getInteractionsByType } = useInteraction()
+    const { executeAction } = useControllerRegistry()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitError, setSubmitError] = useState<string | null>(null)
-
-    // 獲取 controller 實例
-    const controller = useMemo(() => InteractionController.getInstance(), [])
 
     // 獲取該文章的所有高亮
     const highlights = useMemo(
@@ -54,7 +52,11 @@ export function useMarkSection(postId: string) {
         setSubmitError(null)
 
         try {
-            await controller.addHighlight(postId, sectionId, selectedText)
+            await executeAction('InteractionController', 'ADD_HIGHLIGHT', {
+                postId,
+                sectionId,
+                selectedText
+            })
             // 成功後 Context 會自動更新，無需手動處理
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to add highlight'
@@ -63,17 +65,19 @@ export function useMarkSection(postId: string) {
         } finally {
             setIsSubmitting(false)
         }
-    }, [controller, postId, isSubmitting])
+    }, [executeAction, postId, isSubmitting])
 
     // 移除高亮
     const removeHighlight = useCallback(async (highlightId: string): Promise<void> => {
         try {
-            await controller.removeHighlight(highlightId)
+            await executeAction('InteractionController', 'REMOVE_INTERACTION', {
+                interactionId: highlightId
+            })
             // 成功後 Context 會自動更新
         } catch (error) {
             throw error
         }
-    }, [controller])
+    }, [executeAction])
 
     // 移除某個 section 的所有高亮
     const removeHighlightsBySection = useCallback(async (sectionId: string): Promise<void> => {
@@ -82,12 +86,16 @@ export function useMarkSection(postId: string) {
         try {
             // 並行刪除所有高亮
             await Promise.all(
-                sectionHighlights.map(highlight => controller.removeHighlight(highlight.id))
+                sectionHighlights.map(highlight => 
+                    executeAction('InteractionController', 'REMOVE_INTERACTION', {
+                        interactionId: highlight.id
+                    })
+                )
             )
         } catch (error) {
             throw error
         }
-    }, [controller, highlightsBySectionId])
+    }, [executeAction, highlightsBySectionId])
 
     // 獲取特定 section 的高亮
     const getHighlightsBySectionId = useCallback((sectionId: string): PostInteraction[] => {

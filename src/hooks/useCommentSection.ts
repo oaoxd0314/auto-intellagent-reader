@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, RefObject, useEffect } from 'react'
 import { useInteraction } from '../contexts/InteractionContext'
-import { InteractionController } from '../controllers/InteractionController'
+import { useControllerRegistry } from './useControllerRegistry'
 import type { PostInteraction } from '@/types/post'
 
 
@@ -18,8 +18,8 @@ export type CommentPopover = {
  */
 export function useCommentSection(postId: string, containerRef?: RefObject<HTMLDivElement | null>) {
     const { state, getInteractionsByType, getInteractionsBySectionId } = useInteraction()
+    const { executeAction } = useControllerRegistry()
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const controller = InteractionController.getInstance()
 
     // CommentPopover 狀態
     const [popover, setPopover] = useState<CommentPopover>({
@@ -71,11 +71,16 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
 
         setIsSubmitting(true)
         try {
-            await controller.addComment(postId, sectionId, selectedText, content)
+            await executeAction('InteractionController', 'ADD_COMMENT', {
+                postId,
+                sectionId,
+                selectedText,
+                content
+            })
         } finally {
             setIsSubmitting(false)
         }
-    }, [controller, postId, isSubmitting])
+    }, [executeAction, postId, isSubmitting])
 
     // 刪除評論
     const deleteComment = useCallback(async (commentId: string) => {
@@ -87,7 +92,9 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
         setDeletingIds(prev => new Set(prev).add(commentId))
 
         try {
-            await controller.deleteComment(commentId)
+            await executeAction('InteractionController', 'REMOVE_INTERACTION', {
+                interactionId: commentId
+            })
             // InteractionContext 會監聽事件並自動更新狀態
             // useEffect 會監聽 allComments 變化並更新 popover
         } catch (error) {
@@ -99,7 +106,7 @@ export function useCommentSection(postId: string, containerRef?: RefObject<HTMLD
                 return newSet
             })
         }
-    }, [controller, deletingIds])
+    }, [executeAction, deletingIds])
 
     // 獲取特定段落的評論
     const getCommentsBySectionId = useCallback((sectionId: string): PostInteraction[] => {

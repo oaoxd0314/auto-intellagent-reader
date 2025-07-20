@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useControllerRegistry } from './useControllerRegistry'
 import { PostController } from '../controllers/PostController'
 
 /**
@@ -6,59 +7,106 @@ import { PostController } from '../controllers/PostController'
  * 負責 UI 狀態管理 + Controller 調用
  */
 export function usePostsList() {
-    const controller = PostController.getInstance()
+    const { executeAction, getController, isReady } = useControllerRegistry()
+    const controller = getController<PostController>('PostController')
 
     // UI 狀態 - 由 Hook 管理
     const [searchTerm, setSearchTerm] = useState('')
     const [selectedTag, setSelectedTag] = useState<string | null>(null)
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [posts, setPosts] = useState<any[]>([])
+    const [allTags, setAllTags] = useState<string[]>([])
 
-    // 從 Controller 獲取狀態
-    const loadingState = controller.getLoadingState()
-    const errorState = controller.getErrorState()
-    const allPosts = controller.getCachedPosts()
-    const allTags = controller.getCachedTags()
-
-    // 業務邏輯 - 通過 Controller 處理
-    const filteredPosts = controller.advancedSearch(allPosts, {
-        searchTerm: searchTerm || undefined,
-        tags: selectedTag ? [selectedTag] : undefined,
-        sortBy: 'date'
-    })
+    // 使用 PostService 的 搜索功能（這裡應該通過 executeAction 調用）
+    const [filteredPosts, setFilteredPosts] = useState<any[]>([])
 
     // 初始化數據載入
     useEffect(() => {
+        if (!isReady) {
+            // FIXME: Registry應該在所有組件掛載前完成初始化，目前用polling workaround
+            console.debug('[usePostsList] Controller Registry not ready yet, polling will retry')
+            return
+        }
+        
         const loadInitialData = async () => {
+            setLoading(true)
+            setError(null)
             try {
                 await Promise.all([
-                    controller.getAllPosts(),
-                    controller.getAllTags()
+                    executeAction('PostController', 'LOAD_POSTS'),
+                    executeAction('PostController', 'LOAD_TAGS')
                 ])
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Failed to load initial data'
+                setError(errorMessage)
                 console.error('Failed to load initial data:', error)
+            } finally {
+                setLoading(false)
             }
         }
 
         loadInitialData()
+    }, [executeAction, isReady])
+
+    // 事件監聽
+    useEffect(() => {
+        if (!controller) return
+
+        const handlePostsLoaded = (loadedPosts: any[]) => {
+            setPosts(loadedPosts)
+            setFilteredPosts(loadedPosts)
+        }
+
+        const handleTagsLoaded = (loadedTags: string[]) => {
+            setAllTags(loadedTags)
+        }
+
+        const handleSearchCompleted = (result: any) => {
+            setFilteredPosts(result.results || [])
+        }
+
+        controller.on('postsLoaded', handlePostsLoaded)
+        controller.on('tagsLoaded', handleTagsLoaded)
+        controller.on('searchCompleted', handleSearchCompleted)
+
+        return () => {
+            controller.off('postsLoaded', handlePostsLoaded)
+            controller.off('tagsLoaded', handleTagsLoaded)
+            controller.off('searchCompleted', handleSearchCompleted)
+        }
     }, [controller])
 
     // 清除錯誤
     const clearError = useCallback(() => {
-        controller.clearErrors()
-    }, [controller])
+        setError(null)
+    }, [])
 
     // 標籤選擇處理
     const handleTagSelect = useCallback((tag: string | null) => {
         setSelectedTag(tag)
-        // 通知 Controller 更新搜尋過濾器
-        controller.setSearchFilters({ tag: tag || undefined })
-    }, [controller])
+        // 執行搜索
+        executeAction('PostController', 'SEARCH_POSTS', {
+            query: searchTerm,
+            filters: { 
+                tags: tag ? [tag] : undefined,
+                sortBy: 'date'
+            }
+        })
+    }, [executeAction, searchTerm])
 
     // 搜尋處理
     const handleSearch = useCallback((term: string) => {
         setSearchTerm(term)
-        // 通知 Controller 更新搜尋過濾器
-        controller.setSearchFilters({ searchTerm: term || undefined })
-    }, [controller])
+        // 執行搜索
+        executeAction('PostController', 'SEARCH_POSTS', {
+            query: term,
+            filters: { 
+                tags: selectedTag ? [selectedTag] : undefined,
+                sortBy: 'date'
+            }
+        })
+    }, [executeAction, selectedTag])
 
     return {
         // 數據狀態
@@ -68,8 +116,8 @@ export function usePostsList() {
         // UI 狀態
         searchTerm,
         selectedTag,
-        isLoading: loadingState.isLoadingPosts || loadingState.isLoadingTags,
-        error: errorState.postsError || errorState.tagsError,
+        isLoading: loading,
+        error,
 
         // 操作方法
         setSearchTerm: handleSearch,
@@ -77,7 +125,7 @@ export function usePostsList() {
         clearError,
 
         // 統計資訊
-        totalPosts: allPosts.length,
+        totalPosts: posts.length,
         filteredCount: filteredPosts.length
     }
 }
@@ -87,43 +135,81 @@ export function usePostsList() {
  * 負責 UI 狀態管理 + Controller 調用
  */
 export function usePostDetail(id: string) {
-    const controller = PostController.getInstance()
+    const { executeAction, getController, isReady } = useControllerRegistry()
+    const controller = getController<PostController>('PostController')
 
+    // 本地狀態管理
+    const [post, setPost] = useState<any>(null)
+    const [recommendedPosts, setRecommendedPosts] = useState<any[]>([])
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
 
-    // 從 Controller 獲取狀態
-    const loadingState = controller.getLoadingState()
-    const errorState = controller.getErrorState()
-    const post = controller.getCachedPost(id)
-    const allPosts = controller.getCachedPosts()
+    // 事件監聽
+    useEffect(() => {
+        if (!controller) return
 
-    // 業務邏輯 - 通過 Controller 處理
-    const recommendedPosts = post ? controller.getRecommendedPosts(post, allPosts, 3) : []
+        const handlePostLoaded = (loadedPost: any) => {
+            setPost(loadedPost)
+            // 獲取推薦文章
+            executeAction('PostController', 'GET_RECOMMENDATIONS', {
+                currentPost: loadedPost,
+                limit: 3
+            })
+        }
+
+        const handleRecommendationsLoaded = (result: any) => {
+            setRecommendedPosts(result.recommendations || [])
+        }
+
+        const handlePostError = (errorMessage: string) => {
+            setError(errorMessage)
+            setLoading(false)
+        }
+
+        controller.on('postLoaded', handlePostLoaded)
+        controller.on('recommendationsLoaded', handleRecommendationsLoaded)
+        controller.on('postError', handlePostError)
+
+        return () => {
+            controller.off('postLoaded', handlePostLoaded)
+            controller.off('recommendationsLoaded', handleRecommendationsLoaded)
+            controller.off('postError', handlePostError)
+        }
+    }, [controller, executeAction])
 
     // 初始化載入文章
     useEffect(() => {
-        if (!id) return
+        if (!id || !isReady) {
+            if (!isReady) {
+                // FIXME: Registry應該在所有組件掛載前完成初始化，目前用polling workaround
+                console.debug('[usePostDetail] Controller Registry not ready yet, polling will retry')
+            }
+            return
+        }
 
         const loadPost = async () => {
+            setLoading(true)
+            setError(null)
             try {
-                await controller.getPostById(id)
-                // 確保也載入所有文章以便推薦
-                if (allPosts.length === 0) {
-                    await controller.getAllPosts()
-                }
+                await executeAction('PostController', 'LOAD_POST', { id })
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Failed to load post'
+                setError(errorMessage)
                 console.error('Failed to load post:', error)
+            } finally {
+                setLoading(false)
             }
         }
 
         loadPost()
-    }, [id, controller, allPosts.length])
+    }, [id, executeAction, isReady])
 
 
 
     // 清除錯誤
     const clearError = useCallback(() => {
-        controller.clearError('post')
-    }, [controller])
+        setError(null)
+    }, [])
 
     return {
         // 數據狀態
@@ -131,9 +217,8 @@ export function usePostDetail(id: string) {
         recommendedPosts,
 
         // UI 狀態
-        isLoading: loadingState.isLoadingPost,
-
-        error: errorState.postError,
+        isLoading: loading,
+        error,
 
         clearError,
     }
@@ -144,7 +229,7 @@ export function usePostDetail(id: string) {
  * 專門處理文字選擇、評論、標記等互動功能
  */
 export function usePostInteractions(postId: string) {
-    const controller = PostController.getInstance()
+    const { executeAction } = useControllerRegistry()
 
     // UI 狀態
     const [selectedText, setSelectedText] = useState('')
@@ -173,13 +258,21 @@ export function usePostInteractions(postId: string) {
     }, [])
 
     // 標記處理
-    const handleMark = useCallback(() => {
+    const handleMark = useCallback(async () => {
         if (!selectedText || !selectionPosition) return
 
-        controller.addMark(postId, selectedText, selectionPosition)
-        setSelectedText('')
-        setSelectionPosition(null)
-    }, [controller, postId, selectedText, selectionPosition])
+        try {
+            await executeAction('PostController', 'ADD_MARK', {
+                postId,
+                selectedText,
+                position: selectionPosition
+            })
+            setSelectedText('')
+            setSelectionPosition(null)
+        } catch (error) {
+            console.error('Failed to add mark:', error)
+        }
+    }, [executeAction, postId, selectedText, selectionPosition])
 
     // 評論對話框處理
     const openCommentDialog = useCallback(() => {
@@ -208,7 +301,12 @@ export function usePostInteractions(postId: string) {
 
         setIsSubmitting(true)
         try {
-            controller.addComment(postId, selectedText, commentText, selectionPosition)
+            await executeAction('PostController', 'ADD_COMMENT', {
+                postId,
+                selectedText,
+                comment: commentText,
+                position: selectionPosition
+            })
             closeCommentDialog()
             setSelectedText('')
             setSelectionPosition(null)
@@ -217,7 +315,7 @@ export function usePostInteractions(postId: string) {
         } finally {
             setIsSubmitting(false)
         }
-    }, [controller, postId, selectedText, commentText, selectionPosition, closeCommentDialog])
+    }, [executeAction, postId, selectedText, commentText, selectionPosition, closeCommentDialog])
 
     // 提交回覆
     const submitReply = useCallback(async () => {
@@ -225,14 +323,17 @@ export function usePostInteractions(postId: string) {
 
         setIsSubmitting(true)
         try {
-            controller.addReply(postId, replyText)
+            await executeAction('PostController', 'ADD_REPLY', {
+                postId,
+                content: replyText
+            })
             closeReplyDialog()
         } catch (error) {
             console.error('Failed to submit reply:', error)
         } finally {
             setIsSubmitting(false)
         }
-    }, [controller, postId, replyText, closeReplyDialog])
+    }, [executeAction, postId, replyText, closeReplyDialog])
 
     return {
         // 選擇狀態
