@@ -97,6 +97,23 @@ doc/
 - Always define explicit return types for functions
 - **Forbidden**: `switch-case` statements - use object constants instead
 
+### Code Quality and Technical Debt Management:
+- **MANDATORY**: Any workaround, hack, or temporary solution MUST be marked with:
+  - `// TODO: [description]` - for planned improvements
+  - `// FIXME: [description]` - for known issues that need fixing
+  - `// HACK: [description]` - for temporary solutions
+- Examples of workarounds that require marking:
+  - Using `as any` type assertions
+  - Disabling TypeScript checks with `@ts-ignore`
+  - setTimeout hacks for timing issues
+  - Hardcoded values that should be configurable
+  - Incomplete error handling
+  - Performance anti-patterns
+- All marked items should include:
+  - Brief description of the issue
+  - Why the workaround was needed
+  - Planned resolution approach (if known)
+
 ### React Patterns:
 - Use function components and hooks only
 - Extract complex logic into custom hooks

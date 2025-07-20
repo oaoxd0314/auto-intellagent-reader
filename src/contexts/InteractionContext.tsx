@@ -177,9 +177,6 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const controller = controllerRef.current!
     
-    // 初始化 controller
-    controller.initialize()
-    
     // 載入初始數據
     refreshInteractions()
     

@@ -1,7 +1,4 @@
 import { createContext, useContext, useReducer, useEffect, ReactNode, useRef, useCallback, useMemo } from 'react'
-// 移除 BehaviorController 引用
-// import { BehaviorController, type SuggestionStrategy } from '@/controllers/BehaviorController'
-import type { Suggestion } from '@/types/suggestion'
 
 // 節流函數
 function throttle<T extends (...args: any[]) => any>(func: T, delay: number): T {

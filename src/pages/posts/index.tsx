@@ -89,7 +89,7 @@ export default function PostsIndex() {
               >
                 全部
               </button>
-              {allTags.map(tag => (
+              {allTags.map((tag: string) => (
                 <button
                   key={tag}
                   onClick={() => setSelectedTag(tag)}
@@ -127,7 +127,7 @@ export default function PostsIndex() {
             
             {post.tags && post.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {post.tags.map(tag => (
+                {post.tags.map((tag: string) => (
                   <span 
                     key={tag}
                     className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full cursor-pointer hover:bg-blue-200 transition-colors"
