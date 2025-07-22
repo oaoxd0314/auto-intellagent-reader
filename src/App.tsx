@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Suspense, useEffect, useState } from 'react'
 import { routes } from './router/routes'
 import { PostProvider } from './contexts/PostContext'
-import { BehaviorProvider } from './contexts/BehaviorContext'
 import { InteractionProvider } from './contexts/InteractionContext'
 import { ProviderComposer } from './components/ProviderComposer'
 import Navigation from './components/Navigation'
@@ -13,7 +12,7 @@ import './index.css'
 const providers = [
   PostProvider,           // 基礎數據層
   InteractionProvider,    // 互動功能管理
-  BehaviorProvider,       // 行為分析層
+  // BehaviorProvider 已遷移到 Zustand store (useBehaviorStore)
 ]
 
 function App() {

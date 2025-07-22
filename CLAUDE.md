@@ -90,6 +90,20 @@ doc/
 
 ## Development Guidelines
 
+### AI Assistant Guidelines:
+- **CRITICAL**: Provide honest, critical analysis rather than blind agreement
+- **Neutral Stance**: Always evaluate proposals objectively, pointing out potential issues
+- **Critical Thinking**: Challenge assumptions, identify risks, suggest alternatives
+- **Balanced Opinion**: Present both pros and cons of architectural decisions
+- **Real Feedback**: Don't just say "great idea" - provide substantive analysis
+- **Question Everything**: Ask "is this really necessary?" or "what are the trade-offs?"
+- **Architecture Skepticism**: Be especially critical of complex solutions - prefer simple over clever
+- **Examples of Critical Questions**:
+  - "This adds complexity - is the benefit worth it?"
+  - "Have we considered simpler alternatives?"
+  - "What happens if this approach fails?"
+  - "Are we over-engineering this problem?"
+
 ### TypeScript Rules (from .cursor rules):
 - Prefer `type` over `interface`
 - Never use `any` - always define explicit types

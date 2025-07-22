@@ -69,7 +69,7 @@ UI → Hook → Controller.executeAction() ← SuperController ← AI Agent
             Services
 ```
 
-### 🏛️ 簡潔三層架構
+### 🏛️ 簡潔三層架構 + 橫切關注點
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -90,7 +90,7 @@ UI → Hook → Controller.executeAction() ← SuperController ← AI Agent
 ┌─────────────────────▼───────────────────────────┐
 │           Controller Layer (Action Handler)     │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │  Action     │ │    事件      │ │ 業務邏輯     │ │
+│  │  Action     │ │    事件      │ │ 業務邏輯     │ │ 
 │  │   處理      │ │   發送      │ │   協調      │ │
 │  └─────────────┘ └─────────────┘ └─────────────┘ │
 └─────────────────────┬───────────────────────────┘
@@ -108,6 +108,13 @@ UI → Hook → Controller.executeAction() ← SuperController ← AI Agent
               │                     │
               │  主題、用戶狀態       │
               │  全域通知等          │
+              └─────────────────────┘
+
+              ┌─────────────────────┐
+              │  橫切關注點抽象層     │ ✨ NEW
+              │                     │
+              │  BehaviorEventCollector │
+              │  (事件收集/格式化)    │
               └─────────────────────┘
 ```
 
@@ -578,6 +585,103 @@ function App() {
     )
 }
 ```
+
+### 6. **橫切關注點抽象層 (Cross-Cutting Concerns)** ✨
+
+**職責：** 處理跨越多個層級的橫切關注點，提供解耦的抽象接口  
+**原則：** 降低層級間的直接耦合，專注單一橫切關注點
+
+#### **BehaviorEventCollector - 事件收集抽象層**
+
+**設計目的：** 為 AI Agent 提供統一的行為事件收集接口，同時避免 Controller 層直接依賴 Zustand Store
+
+```typescript
+// src/lib/BehaviorEventCollector.ts
+export class BehaviorEventCollector {
+    private static instance: BehaviorEventCollector | null = null
+
+    static getInstance(): BehaviorEventCollector {
+        if (!this.instance) {
+            this.instance = new BehaviorEventCollector()
+        }
+        return this.instance
+    }
+
+    /**
+     * 收集 Controller 事件 - 統一入口
+     */
+    collectControllerEvent(controller: string, message: string, data?: any): void {
+        const eventLog = this.createEventLog(controller, message, data)
+        // 內部使用 store，外部不知道實現細節
+        useBehaviorStore.getState().collectEvent(eventLog)
+    }
+
+    /**
+     * 行為收集狀態管理
+     */
+    startCollecting(postId: string): void {
+        useBehaviorStore.getState().startCollecting(postId)
+    }
+
+    stopCollecting(): void {
+        useBehaviorStore.getState().stopCollecting()
+    }
+
+    /**
+     * 獲取行為數據 - 提供統一接口
+     */
+    getBehaviorData() {
+        return useBehaviorStore.getState().getBehaviorData()
+    }
+
+    /**
+     * 事件格式化 Factory - 統一事件日誌格式
+     */
+    private createEventLog(controller: string, message: string, data?: any): string {
+        const timestamp = Date.now()
+        const dataStr = data ? JSON.stringify(data) : ''
+        return `${timestamp}|${controller}|${message}|${dataStr}`
+    }
+
+    /**
+     * 未來擴展點：過濾、批處理、發送到服務器等
+     */
+    private shouldCollectEvent(controller: string, message: string): boolean {
+        // 可以在這裡加入過濾邏輯
+        return true
+    }
+}
+
+// 導出單例實例供全局使用
+export const behaviorEventCollector = BehaviorEventCollector.getInstance()
+```
+
+**整合方式：**
+```typescript
+// AbstractController.ts 中使用
+import { behaviorEventCollector } from '../lib/BehaviorEventCollector'
+
+protected log(message: string, data?: any): void {
+    if (process.env.NODE_ENV === 'development') {
+        const prefix = `[${this.name}]`
+        if (data !== undefined) {
+            console.log(prefix, message, data)
+        } else {
+            console.log(prefix, message)
+        }
+
+        // 通過抽象層收集事件 - 完全不知道底層 store 實現
+        behaviorEventCollector.collectControllerEvent(this.name, message, data)
+    }
+}
+```
+
+**架構優勢：**
+- ✅ **降低耦合**: AbstractController 不依賴 zustand 或具體 store 實現
+- ✅ **統一接口**: 所有事件收集都通過這一層，格式標準化
+- ✅ **易於替換**: 想換底層存儲只需改 EventCollector 內部實現
+- ✅ **符合 SOLID**: 單一職責、開放封閉、依賴反轉原則
+- ✅ **未來擴展**: 可加入過濾、批處理、遠程發送等功能
 
 ## 🔄 數據流運作機制
 
