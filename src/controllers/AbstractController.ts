@@ -1,3 +1,5 @@
+import { behaviorEventCollector } from '../lib/BehaviorEventCollector'
+
 /**
  * Action Handler 類型定義
  */
@@ -140,7 +142,7 @@ export abstract class AbstractController {
     }
 
     /**
-     * 日誌輔助方法
+     * 日誌輔助方法 - 整合行為事件收集
      */
     protected log(message: string, data?: any): void {
         if (process.env.NODE_ENV === 'development') {
@@ -150,6 +152,9 @@ export abstract class AbstractController {
             } else {
                 console.log(prefix, message)
             }
+
+            // 通過抽象層收集事件 - 完全不知道底層 store 實現
+            behaviorEventCollector.collectControllerEvent(this.name, message, data)
         }
     }
 }

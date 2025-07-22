@@ -17,14 +17,10 @@
 | 模組 | 狀態 | 完成度 |
 |------|------|--------|
 | 基礎架構 | ✅ 完成 | 100% |
-| 路由系統 | ✅ 完成 | 100% |
-| UI 組件 | ✅ 完成 | 100% |
-| Markdown 解析 | ✅ 完成 | 100% |
 | Event-Driven 架構 | ✅ 完成 | 100% |
-| Controller 系統 | ✅ 完成 | 95% |
-| Action Handler 模式 | ✅ 完成 | 100% |
-| 行為追蹤 | 🚧 開發中 | 60% |
-| AI Agent 準備 | ✅ 完成 | 90% |
+| Controller 系統 | ✅ 完成 | 100% |
+| 行為事件收集 | ✅ 完成 | 100% |
+| AI Agent 基礎 | 🚧 開發中 | 20% |
 
 ---
 
@@ -79,27 +75,25 @@ pnpm dev
 
 ## 🎯 下一步
 
-**當前階段: AI Agent SuperController 實現** 🚀
+**當前階段: Natural LLM Integration** 🚀
 
-### ✅ 已完成 (重構階段)
+### ✅ 已完成 
 - ✅ Event-Driven Action Handler 架構
 - ✅ ControllerRegistry 統一管理 (22 Actions)
-- ✅ Command Pattern 基礎建立
-- ✅ 所有 Controller 轉換為純 Action Handler
+- ✅ 行為事件收集系統 (BehaviorEventCollector)
+- ✅ Zustand 狀態管理遷移
 
-### 🚧 技術債務待處理
-- [ ] 修復 Controller Registry 初始化時序問題 (FIXME)
-- [ ] 改善 executeAction 返回類型推斷 (TODO)
+### 🚧 進行中: AI Agent 智能建議系統
+**目標**: 基於行為分析提供智能操作建議
 
-### 🚀 下一個里程碑: SuperController
-- [ ] 創建 SuperController 類
-- [ ] 實現 AI Agent string command parsing
-- [ ] 建立 Action 執行策略 (direct/toast)
-- [ ] 整合 OpenRouter API
+**下一步**: 
+1. 實作 AI 行為分析引擎
+2. 建議生成和隊列管理 
+3. Toast UI 非侵入式建議展示
 
-詳細計劃請參考:
-- [Controller 重構狀態](./doc/dev/refactor/controller-refactor-todo.md)
-- [功能規格總覽](./doc/spec/features.md)
+詳細規格請參考:
+- [AI 行為分析架構](./doc/spec/ai-behavior-architecture.md)
+- [系統架構文檔](./doc/dev/architecture.md)
 
 ---
 
