@@ -6,6 +6,7 @@ import { InteractionProvider } from './contexts/InteractionContext'
 import { ProviderComposer } from './components/ProviderComposer'
 import Navigation from './components/Navigation'
 import { AppInitializer } from './lib/AppInitializer'
+import { Toaster } from '@/components/ui/toaster'
 import './index.css'
 
 // Provider 配置 - 按依賴順序排列
@@ -99,6 +100,7 @@ function App() {
             </Suspense>
           </main>
         </div>
+        <Toaster />
       </ProviderComposer>
     </BrowserRouter>
   )

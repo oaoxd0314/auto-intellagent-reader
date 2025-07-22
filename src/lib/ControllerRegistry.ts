@@ -31,7 +31,7 @@ export class ControllerRegistry {
     private controllers = new Map<string, ControllerRegistration>()
     private initialized = false
 
-    private constructor() {}
+    private constructor() { }
 
     /**
      * 單例模式
@@ -72,7 +72,7 @@ export class ControllerRegistry {
         })
 
         this.initialized = true
-        
+
         // 輸出註冊摘要
         this.logRegistrationSummary()
     }
@@ -81,8 +81,8 @@ export class ControllerRegistry {
      * 註冊單個 Controller
      */
     private registerController(
-        name: string, 
-        controller: AbstractController, 
+        name: string,
+        controller: AbstractController,
         options: { description?: string; category?: string } = {}
     ): void {
         const registration: ControllerRegistration = {
@@ -152,7 +152,7 @@ export class ControllerRegistry {
      */
     async executeAction(controllerName: string, actionType: string, payload?: any): Promise<void> {
         const controller = this.getController(controllerName)
-        
+
         if (!controller) {
             throw new Error(`Controller not found: ${controllerName}`)
         }
@@ -165,7 +165,7 @@ export class ControllerRegistry {
      */
     hasAction(controllerName: string, actionType: string): boolean {
         const controller = this.getController(controllerName)
-        
+
         if (!controller) {
             return false
         }
@@ -190,14 +190,14 @@ export class ControllerRegistry {
      */
     async destroy(): Promise<void> {
         console.log('[ControllerRegistry] Destroying all controllers...')
-        
+
         this.controllers.forEach((registration) => {
             registration.instance.destroy()
         })
-        
+
         this.controllers.clear()
         this.initialized = false
-        
+
         console.log('[ControllerRegistry] All controllers destroyed')
     }
 
@@ -223,13 +223,13 @@ export class ControllerRegistry {
     private logRegistrationSummary(): void {
         console.log('\n=== Controller Registry Summary ===')
         console.log(`Total Controllers: ${this.controllers.size}`)
-        
+
         const discoveries = this.discoverAllActions()
         discoveries.forEach(discovery => {
             console.log(`\n📋 ${discovery.controllerName} (${discovery.category || 'unknown'})`)
             console.log(`   Actions: ${discovery.actions.join(', ')}`)
         })
-        
+
         const totalActions = discoveries.reduce((sum, d) => sum + d.actions.length, 0)
         console.log(`\n🎯 Total Available Actions: ${totalActions}`)
         console.log('===================================\n')
