@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { usePostsList } from '../../hooks/usePostPage'
+import { PageBehaviorTracker, BehaviorContext } from '../../components/BehaviorTracker'
 
 export default function PostsIndex() {
   // 只與 Hook 交互 - 符合架構設計
@@ -51,7 +52,8 @@ export default function PostsIndex() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <PageBehaviorTracker context={BehaviorContext.postList()}>
+      <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold">所有文章</h1>
@@ -163,6 +165,7 @@ export default function PostsIndex() {
           <p>目前沒有文章</p>
         </div>
       )}
-    </div>
+      </div>
+    </PageBehaviorTracker>
   )
 } 
