@@ -29,9 +29,40 @@ AI Agent (字串指令)
 ┌──────────────────┐
 │ SuperController  │  (Invoker / Mediator)
 └──────────────────┘
-  ├─ DirectApplyPolicy ─▶ Controller Facade ─▶ xxxController / Service
+        │
+        ▼
+┌──────────────────┐
+│ ControllerRegistry│  (統一管理和發現機制)
+└──────────────────┘
+  ├─ DirectApplyPolicy ─▶ executeAction() ─▶ xxxController / Service
   │
-  └─ Queue ─▶ ToastPolicy ─▶ User Confirm ─▶ Controller Facade ─▶ xxxController / Service
+  └─ Queue ─▶ ToastPolicy ─▶ User Confirm ─▶ executeAction() ─▶ xxxController / Service
+```
+
+### ✨ ControllerRegistry 職責
+
+**ControllerRegistry** 是整個系統的核心管理器：
+
+- **🎯 Controller 註冊和管理**: 所有 Controller 實例都通過 Registry 註冊和管理
+- **🔍 Action 發現機制**: 動態發現所有可用的 Actions 供 AI Agent 使用
+- **⚡ 統一執行介面**: 提供 `executeAction(controllerName, actionType, payload)` 統一調用
+- **📊 狀態監控**: 提供 Controller 狀態、Action 列表等管理信息
+- **🔧 生命週期管理**: 統一的初始化和銷毀流程
+
+```typescript
+// ControllerRegistry 使用範例
+const registry = ControllerRegistry.getInstance()
+
+// 發現所有可用 Actions
+const discoveries = registry.discoverAllActions()
+// 結果: [
+//   { controllerName: 'PostController', actions: ['LOAD_POSTS', 'SEARCH_POSTS', ...] },
+//   { controllerName: 'AIAgentController', actions: ['ANALYZE_BEHAVIOR', ...] }
+// ]
+
+// 統一執行 Action
+await registry.executeAction('PostController', 'LOAD_POST', { id: 'example' })
+await registry.executeAction('AIAgentController', 'ANALYZE_BEHAVIOR')
 ```
 
 ### 核心元件說明
