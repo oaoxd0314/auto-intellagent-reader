@@ -1,22 +1,25 @@
-// 建議類型
-export type SuggestionType = 'bookmark' | 'note' | 'summary' | 'related' | 'break'
-
-// 建議對象
-export interface Suggestion {
-    id: string
-    type: SuggestionType
-    title: string
-    description: string
-    confidence: number    // 0-1 建議信心度
-    priority: number      // 1-5 優先級
-    action: () => Promise<void>
-    metadata?: Record<string, any>
+/**
+ * AI 建議類型定義 - 符合 ai-behavior-architecture.md 規格
+ */
+export interface AISuggestion {
+  id: string
+  type: 'action' | 'recommendation' | 'reminder'
+  actionString: string  // e.g., "ADD_TO_BOOKMARK postId=current"
+  description: string   // 給用戶看的描述
+  priority: 'low' | 'medium' | 'high'
+  timestamp: number
 }
 
-// 建議歷史記錄
-export interface SuggestionHistory {
-    suggestion: Suggestion
-    timestamp: number
-    decision: 'accepted' | 'rejected' | 'ignored'
-    executionResult?: 'success' | 'error'
+/**
+ * 用戶回應動作類型
+ */
+export type UserResponseAction = 'accept' | 'reject' | 'dismiss'
+
+/**
+ * 用戶回應類型定義
+ */
+export interface UserResponse {
+  suggestionId: string
+  action: UserResponseAction
+  timestamp: number
 } 

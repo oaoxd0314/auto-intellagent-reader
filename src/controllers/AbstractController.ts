@@ -21,6 +21,11 @@ type EventListener = (...args: any[]) => void
  * 新版抽象控制器基類
  * 專注於 Event-Driven Action Handler 模式
  * 為 AI Agent SuperController 架構準備
+ * 
+ * TODO: FIXME: 移除子類的 getInstance 單例模式
+ * - Controller 不應該負責實例管理
+ * - 應該由 ControllerRegistry 或 DI 容器統一管理
+ * - 目前各個 Controller 子類都有 getInstance 方法是技術債
  */
 export abstract class AbstractController {
     protected listeners: Record<string, EventListener[]> = {}
