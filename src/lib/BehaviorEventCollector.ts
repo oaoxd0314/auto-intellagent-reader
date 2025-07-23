@@ -75,32 +75,59 @@ export class BehaviorEventCollector {
     options?: EventOptions
   ): void {
     if (!this.config.enabled) {
+      console.log('⚠️ [BehaviorEventCollector] 事件收集已禁用，跳過:', { controller, message })
       return
     }
 
     // 事件級別過濾
     if (options?.level && !this.shouldLogEvent(options.level)) {
+      console.log('⚠️ [BehaviorEventCollector] 事件級別過濾，跳過:', { controller, message, level: options.level })
       return
     }
 
     const eventLog = this.createEventLog(controller, message, data, options)
+    
+    console.log('🔄 [BehaviorEventCollector] 處理事件:', {
+      控制器: controller,
+      消息: message,
+      數據: data ? '有' : '無',
+      級別: options?.level || 'info',
+      格式化後: eventLog.substring(0, 100) + '...'
+    })
 
     this.sendToStore(eventLog)
   }
 
   /**
-   * 行為收集狀態管理
+   * 上下文管理 - 替代原來的 startCollecting/stopCollecting
    */
-  startCollecting(postId: string): void {
-    if (!this.config.enabled) return
+  setCurrentContext(context: string | null): void {
+    if (!this.config.enabled) {
+      console.log('⚠️ [BehaviorEventCollector] 事件收集已禁用，無法設置上下文')
+      return
+    }
 
-    useBehaviorStore.getState().startCollecting(postId)
+    console.log('🎯 [BehaviorEventCollector] 設置當前上下文:', { context })
+    useBehaviorStore.getState().setCurrentContext(context)
+    
+    const status = this.getCollectionStatus()
+    console.log('✅ [BehaviorEventCollector] 上下文已更新:', status)
   }
 
-  stopCollecting(): void {
-    if (!this.config.enabled) return
+  /**
+   * 清空事件記錄 - 用於上下文切換時的清理
+   */
+  clearEvents(): void {
+    if (!this.config.enabled) {
+      console.log('⚠️ [BehaviorEventCollector] 事件收集已禁用，無法清空事件')
+      return
+    }
 
-    useBehaviorStore.getState().stopCollecting()
+    console.log('🧹 [BehaviorEventCollector] 清空事件記錄')
+    const previousStatus = this.getCollectionStatus()
+    console.log('📊 [BehaviorEventCollector] 清空前統計:', previousStatus)
+    
+    useBehaviorStore.getState().clearEvents()
   }
 
   /**
@@ -111,18 +138,31 @@ export class BehaviorEventCollector {
   }
 
   /**
-   * 獲取收集狀態
+   * 獲取收集狀態 - 更新後的狀態信息
    */
   getCollectionStatus(): {
-    isCollecting: boolean
+    enabled: boolean
     eventCount: number
-    currentPostId: string | null
+    relevantEventCount: number
+    currentContext: string | null
+    sessionDuration: number
   } {
     const state = useBehaviorStore.getState()
+    const relevantEvents = state.controllerEvents.filter(event => {
+      return event.includes('PostController') || 
+             event.includes('InteractionController') ||
+             event.includes('MarkdownRenderer') ||
+             (!event.includes('AIAgentController') && 
+              !event.includes('initialized') && 
+              !event.includes('destroyed'))
+    })
+
     return {
-      isCollecting: state.isCollecting,
+      enabled: this.config.enabled,
       eventCount: state.controllerEvents.length,
-      currentPostId: state.currentPostId
+      relevantEventCount: relevantEvents.length,
+      currentContext: state.currentContext,
+      sessionDuration: Date.now() - state.sessionStart
     }
   }
 

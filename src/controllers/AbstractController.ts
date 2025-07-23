@@ -154,7 +154,10 @@ export abstract class AbstractController {
             }
 
             // 通過抽象層收集事件 - 完全不知道底層 store 實現
-            behaviorEventCollector.collectControllerEvent(this.name, message, data)
+            behaviorEventCollector.collectControllerEvent(this.name, message, data, {
+                level: 'info',
+                category: 'system-action'
+            })
         }
     }
 }
