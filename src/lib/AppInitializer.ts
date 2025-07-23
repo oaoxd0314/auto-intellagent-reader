@@ -1,4 +1,5 @@
 import { ControllerRegistry } from './ControllerRegistry'
+import { intervalManager } from './IntervalManager'
 
 /**
  * 應用程式統一初始化器
@@ -24,10 +25,14 @@ export class AppInitializer {
             const registry = ControllerRegistry.getInstance()
             await registry.initialize()
 
-            // 2. 可以在這裡添加其他系統初始化
-            // await DatabaseInitializer.initialize()
-            // await ConfigManager.initialize()
-            // await AnalyticsManager.initialize()
+            // 2. 註冊間隔任務
+            intervalManager.register('ai-behavior-analysis', {
+                callback: () => registry.executeAction('AIAgentController', 'ANALYZE_BEHAVIOR'),
+                interval: 30000 // 30秒
+            })
+
+            // 3. 啟動間隔任務
+            intervalManager.startAll()
 
             AppInitializer.initialized = true
             console.log('✅ [AppInitializer] Application initialized successfully')
@@ -71,6 +76,9 @@ export class AppInitializer {
         console.log('[AppInitializer] Cleaning up application...')
 
         try {
+            // 停止間隔任務
+            intervalManager.stopAll()
+            
             const registry = ControllerRegistry.getInstance()
             await registry.destroy()
 

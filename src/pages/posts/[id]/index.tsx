@@ -3,6 +3,7 @@ import { usePostDetail } from '../../../hooks/usePostPage'
 import { StructuredMarkdownRenderer } from '../../../components/MarkdownRender'
 import { PostReplySection } from '../../../components/PostReplySection'
 import { useInteraction } from '../../../contexts/InteractionContext'
+import { PageBehaviorTracker, BehaviorContext } from '../../../components/BehaviorTracker'
 
 
 function PostDetailContent() {
@@ -159,7 +160,11 @@ function PostDetailContent() {
 }
 
 export default function PostDetail() {
+  const { id } = useParams<{ id: string }>()
+  
   return (
+    <PageBehaviorTracker context={id ? BehaviorContext.post(id) : null}>
       <PostDetailContent />
+    </PageBehaviorTracker>
   )
 } 

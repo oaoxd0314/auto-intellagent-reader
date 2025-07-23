@@ -2,6 +2,7 @@ import { AbstractController } from '../controllers/AbstractController'
 import { PostController } from '../controllers/PostController'
 import { InteractionController } from '../controllers/InteractionController'
 import { AIAgentController } from '../controllers/AIAgentController'
+import { AISuggestionController } from '../controllers/AISuggestionController'
 
 /**
  * Controller 註冊項目
@@ -68,6 +69,11 @@ export class ControllerRegistry {
 
         this.registerController('AIAgentController', AIAgentController.getInstance(), {
             description: 'AI Agent 對話管理',
+            category: 'ai'
+        })
+
+        this.registerController('AISuggestionController', AISuggestionController.getInstance(), {
+            description: 'AI 建議隊列管理和協調',
             category: 'ai'
         })
 

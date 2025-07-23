@@ -30,35 +30,36 @@ interface UserPattern {
   focus_areas: string[]
 }
 
-// 行為數據類型 - 從原 Context 遷移
+// 行為數據類型 - 更新後支援事件過濾
 interface BehaviorData {
-  recentEvents: string[]
+  recentEvents: string[] // 過濾後的相關事件
   userPattern: UserPattern
   sessionData: {
     sessionStart: number
     duration: number
-    eventCount: number
+    eventCount: number // 相關事件數量
+    totalEventCount: number // 總事件數量
+    currentContext: string | null // 當前上下文
   }
   timestamp: number
 }
 
 // Store 狀態和方法定義
 interface BehaviorStore {
-  // State - 完全對應原 Context
-  isCollecting: boolean
-  currentPostId: string | null
+  // State - 簡化後的狀態
   controllerEvents: string[]
   sessionStart: number
   lastEventTime: number
   error: string | null
+  currentContext: string | null // 當前上下文（如 postId），用於分析過濾
 
-  // Actions - 完全對應原 Context 方法
-  startCollecting: (postId: string) => void
-  stopCollecting: () => void
+  // Actions - 簡化後的方法
   collectEvent: (eventLog: string) => void
+  setCurrentContext: (context: string | null) => void
   getUserPattern: () => UserPattern
   getBehaviorData: () => BehaviorData
   clearError: () => void
+  clearEvents: () => void
 
   // Internal methods
   _setError: (error: string | null) => void
@@ -87,40 +88,46 @@ export const useBehaviorStore = create<BehaviorStore>()(
       }, 100)
 
       return {
-        // Initial state - 對應原 Context initialState
-        isCollecting: false,
-        currentPostId: null,
+        // Initial state - 簡化後的初始狀態
         controllerEvents: [],
         sessionStart: Date.now(),
         lastEventTime: 0,
         error: null,
+        currentContext: null,
 
-        // Actions - 完全對應原 Context 方法
-        startCollecting: (postId: string) => {
-          throttledSet({
-            isCollecting: true,
-            currentPostId: postId,
-            sessionStart: Date.now(),
-            controllerEvents: []
-          })
-        },
-
-        stopCollecting: () => {
-          throttledSet({
-            isCollecting: false,
-            currentPostId: null,
-            controllerEvents: []
-          })
-        },
-
+        // Actions - 簡化後的方法實現
         collectEvent: (eventLog: string) => {
           const state = get()
-          if (state.isCollecting) {
-            throttledSet({
-              controllerEvents: [...state.controllerEvents.slice(-49), eventLog], // 保持最近50個事件
-              lastEventTime: Date.now()
-            })
-          }
+          console.log('📝 [BehaviorStore] 收集新事件:', eventLog)
+          console.log('📊 [BehaviorStore] 當前狀態:', {
+            當前上下文: state.currentContext,
+            事件總數: state.controllerEvents.length,
+            最新事件時間: new Date(state.lastEventTime).toLocaleTimeString()
+          })
+          
+          // 全局收集所有事件，不再檢查 isCollecting flag
+          throttledSet({
+            controllerEvents: [...state.controllerEvents.slice(-49), eventLog], // 保持最近50個事件
+            lastEventTime: Date.now()
+          })
+        },
+
+        setCurrentContext: (context: string | null) => {
+          console.log('🎯 [BehaviorStore] 設置當前上下文:', context)
+          throttledSet({
+            currentContext: context,
+            // 如果切換上下文，重置 session 開始時間
+            sessionStart: context ? Date.now() : Date.now()
+          })
+        },
+
+        clearEvents: () => {
+          console.log('🧹 [BehaviorStore] 清空事件記錄')
+          throttledSet({
+            controllerEvents: [],
+            sessionStart: Date.now(),
+            lastEventTime: 0
+          })
         },
 
         getUserPattern: (): UserPattern => {
@@ -128,26 +135,49 @@ export const useBehaviorStore = create<BehaviorStore>()(
           const { controllerEvents, sessionStart } = state
           const duration = Date.now() - sessionStart
 
-          // 簡單的模式分析邏輯 - 與原 Context 完全相同
-          const eventCount = controllerEvents.length
-          const avgEventInterval = duration / Math.max(eventCount, 1)
+          // 🎯 簡化：只要是用戶行為相關的事件就保留
+          const relevantEvents = controllerEvents.filter(event => {
+            // 排除 AI 系統自己的事件和生命週期事件
+            return !event.includes('AIAgentController') && 
+                   !event.includes('initialized') && 
+                   !event.includes('destroyed')
+          })
+
+          console.log('🔍 [BehaviorStore] 事件過濾結果:', {
+            總事件數: controllerEvents.length,
+            相關事件數: relevantEvents.length,
+            過濾比例: `${Math.round((relevantEvents.length / Math.max(controllerEvents.length, 1)) * 100)}%`
+          })
+
+          // 基於相關事件進行模式分析
+          const eventCount = relevantEvents.length
+          const avgEventInterval = eventCount > 0 ? duration / eventCount : duration
 
           let type: UserPattern['type'] = 'reading'
           let confidence = 0.5
 
-          if (avgEventInterval < 1000) {
+          // 根據事件頻率判斷閱讀模式
+          if (avgEventInterval < 1000 && eventCount > 3) {
             type = 'scanning'
             confidence = 0.8
-          } else if (avgEventInterval > 5000) {
+          } else if (avgEventInterval > 5000 && eventCount > 1) {
             type = 'studying'
             confidence = 0.7
+          } else if (eventCount > 0) {
+            type = 'reading'
+            confidence = 0.6
+          }
+
+          // 如果沒有相關事件，降低信心度
+          if (eventCount === 0) {
+            confidence = 0.1
           }
 
           return {
             type,
             confidence,
             duration,
-            focus_areas: extractFocusAreas(controllerEvents)
+            focus_areas: extractFocusAreas(relevantEvents) // 使用過濾後的事件
           }
         },
 
@@ -155,13 +185,23 @@ export const useBehaviorStore = create<BehaviorStore>()(
           const state = get()
           const userPattern = state.getUserPattern()
 
+          // 同樣在這裡應用事件過濾，確保一致性
+          const relevantEvents = state.controllerEvents.filter(event => {
+            // 排除 AI 系統自己的事件和生命週期事件
+            return !event.includes('AIAgentController') && 
+                   !event.includes('initialized') && 
+                   !event.includes('destroyed')
+          })
+
           return {
-            recentEvents: [...state.controllerEvents],
+            recentEvents: [...relevantEvents], // 只返回相關事件
             userPattern,
             sessionData: {
               sessionStart: state.sessionStart,
               duration: Date.now() - state.sessionStart,
-              eventCount: state.controllerEvents.length
+              eventCount: relevantEvents.length, // 使用過濾後的事件數量
+              totalEventCount: state.controllerEvents.length, // 新增：總事件數量供參考
+              currentContext: state.currentContext // 新增：當前上下文信息
             },
             timestamp: Date.now()
           }
@@ -191,35 +231,49 @@ export const useBehaviorStore = create<BehaviorStore>()(
   )
 )
 
-// Selectors for better performance - 可選的性能優化
-export const useBehaviorCollecting = () => useBehaviorStore(state => state.isCollecting)
+// Selectors for better performance - 更新後的選擇器
 export const useBehaviorEvents = () => useBehaviorStore(state => state.controllerEvents)
 export const useBehaviorError = () => useBehaviorStore(state => state.error)
+export const useBehaviorContext = () => useBehaviorStore(state => state.currentContext)
 export const useBehaviorActions = () => useBehaviorStore(state => ({
-  startCollecting: state.startCollecting,
-  stopCollecting: state.stopCollecting,
   collectEvent: state.collectEvent,
+  setCurrentContext: state.setCurrentContext,
+  clearEvents: state.clearEvents,
   clearError: state.clearError
 }))
 
-// Migration compatibility: 提供與原 useBehavior hook 相同的介面
+// 獲取過濾後的相關事件（用於 AI 分析）
+export const useRelevantBehaviorEvents = () => useBehaviorStore(state => {
+  return state.controllerEvents.filter(event => {
+    return event.includes('PostController') || 
+           event.includes('InteractionController') ||
+           event.includes('MarkdownRenderer') ||
+           (!event.includes('AIAgentController') && 
+            !event.includes('initialized') && 
+            !event.includes('destroyed'))
+  })
+})
+
+// 獲取當前用戶行為模式
+export const useBehaviorPattern = () => useBehaviorStore(state => state.getUserPattern())
+
+// 簡化的 useBehavior hook - 向後兼容但功能精簡
 export const useBehavior = () => {
   const state = useBehaviorStore()
   return {
-    // State properties
-    isCollecting: state.isCollecting,
-    currentPostId: state.currentPostId,
+    // State properties - 更新後的狀態
     controllerEvents: state.controllerEvents,
+    currentContext: state.currentContext,
     sessionStart: state.sessionStart,
     lastEventTime: state.lastEventTime,
     error: state.error,
 
-    // Action methods
-    startCollecting: state.startCollecting,
-    stopCollecting: state.stopCollecting,
+    // Action methods - 更新後的方法  
     collectEvent: state.collectEvent,
+    setCurrentContext: state.setCurrentContext,
     getUserPattern: state.getUserPattern,
     getBehaviorData: state.getBehaviorData,
+    clearEvents: state.clearEvents,
     clearError: state.clearError
   }
 }
