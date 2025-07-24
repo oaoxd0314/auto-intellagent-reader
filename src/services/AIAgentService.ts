@@ -8,12 +8,10 @@ export class AIAgentService {
 
     /**
      * 檢查 API 配置是否完整
-     * 目前強制返回 false，使用 mock 模式
      */
     static isConfigured(): boolean {
-        // 強制使用 mock 模式，避免真實 API 調用
-        return false
-        // return !!(import.meta as any).env.VITE_OPENROUTER_API_KEY
+        const apiKey = (import.meta as any).env.VITE_OPENROUTER_API_KEY
+        return !!(apiKey && apiKey.trim().length > 0)
     }
 
     /**
@@ -25,35 +23,83 @@ export class AIAgentService {
         maxTokens?: number;
     }): Promise<string> {
         if (!this.isConfigured()) {
-            throw new Error('請在 .env.local 中設定 VITE_OPENROUTER_API_KEY')
+            console.warn('[AIAgentService] API not configured, using fallback')
+            throw new Error('VITE_OPENROUTER_API_KEY 未設定或為空')
         }
 
         const model = options?.model || (import.meta as any).env.VITE_OPENROUTER_MODEL || this.DEFAULT_MODEL
+        const apiKey = (import.meta as any).env.VITE_OPENROUTER_API_KEY
 
-        const response = await fetch(`${this.API_BASE_URL}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${(import.meta as any).env.VITE_OPENROUTER_API_KEY}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': window.location.origin,
-                'X-Title': 'Auto Intellagent Reader'
-            },
-            body: JSON.stringify({
-                model,
-                messages,
-                stream: false,
-                temperature: options?.temperature || 0.7,
-                max_tokens: options?.maxTokens || 1000
-            })
+        console.log('[AIAgentService] Calling OpenRouter API', {
+            model,
+            messagesCount: messages.length,
+            temperature: options?.temperature || 0.7
         })
 
-        if (!response.ok) {
-            const errorText = await response.text()
-            throw new Error(`API 調用失敗: ${response.status} - ${errorText}`)
-        }
+        try {
+            const response = await fetch(`${this.API_BASE_URL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': window.location.origin,
+                    'X-Title': 'Auto Intellagent Reader'
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    stream: false,
+                    temperature: options?.temperature || 0.7,
+                    max_tokens: options?.maxTokens || 1000
+                })
+            })
 
-        const data = await response.json()
-        return data.choices?.[0]?.message?.content || '無回應內容'
+            if (!response.ok) {
+                const errorText = await response.text()
+                console.error('[AIAgentService] API call failed', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText
+                })
+                throw new Error(`OpenRouter API 調用失敗: ${response.status} - ${errorText}`)
+            }
+
+            const data = await response.json()
+            const content = data.choices?.[0]?.message?.content
+
+            if (!content) {
+                console.warn('[AIAgentService] Empty response from API', data)
+                throw new Error('AI 回應內容為空')
+            }
+
+            console.log('[AIAgentService] API call successful', {
+                responseLength: content.length,
+                usage: data.usage
+            })
+
+            return content
+
+        } catch (error) {
+            console.error('[AIAgentService] Error during API call', error)
+
+            // 重新拋出錯誤，讓調用方決定如何處理（fallback 或顯示錯誤）
+            throw error
+        }
     }
 
+    /**
+     * 獲取當前 API 配置狀態信息
+     */
+    static getConfigStatus() {
+        const apiKey = (import.meta as any).env.VITE_OPENROUTER_API_KEY
+        const model = (import.meta as any).env.VITE_OPENROUTER_MODEL || this.DEFAULT_MODEL
+
+        return {
+            isConfigured: this.isConfigured(),
+            hasApiKey: !!(apiKey && apiKey.trim().length > 0),
+            apiKeyLength: apiKey ? apiKey.length : 0,
+            model,
+            defaultModel: this.DEFAULT_MODEL
+        }
+    }
 } 

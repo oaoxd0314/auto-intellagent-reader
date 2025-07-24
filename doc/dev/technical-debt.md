@@ -144,14 +144,117 @@ function executeAction<
 
 ---
 
+#### 3. AI Agent 動作映射與 Section ID 整合問題
+**標記:** TODO  
+**狀態:** 需改善  
+**描述:** AI Agent 的動作建議系統缺乏完整的 section ID 整合，影響基於位置的智能建議準確性
+
+**影響範圍:**
+- `src/controllers/AIAgentController.ts:generateSuggestionsFromAnalysis` - 硬編碼動作映射，缺乏動態發現
+- `src/controllers/InteractionController.ts:343-381` - ADD_NOTE 動作需要 sectionId 和 selectedText 參數
+- `src/hooks/useSelectionSection.ts` - 提供 section ID 檢測但未整合到 AI 系統
+
+**當前 Workaround:**
+```typescript
+// InteractionController.ts - Mock 實現
+private async addNoteAction(payload: {
+    postId: string
+    sectionId: string  // TODO: 整合 useSelectionSection
+    selectedText: string
+    content: string
+}): Promise<void>
+
+// AIAgentController.ts - 硬編碼映射
+const actionMapping = {
+    bookmark: 'ADD_TO_BOOKMARK',
+    summary: 'CREATE_SUMMARY', 
+    note: 'ADD_NOTE'  // TODO: 需要 sectionId 支持
+}
+```
+
+**推薦解決方案:**
+
+#### 選項 1: AI Agent Context 擴展 (推薦)
+```typescript
+// 擴展 AI Agent 建議系統以包含上下文信息
+interface AISuggestionContext {
+  currentSelection?: {
+    sectionId: string
+    selectedText: string
+    position: { x: number, y: number }
+  }
+  currentPost?: {
+    id: string
+    readingProgress: number
+  }
+  behaviorPattern?: UserBehaviorPattern
+}
+
+// AIAgentController 整合 useSelectionSection
+class AIAgentController {
+  generateSuggestionsFromAnalysis(
+    analysis: string, 
+    context: AISuggestionContext
+  ): AISuggestion[]
+}
+```
+
+#### 選項 2: 動態動作發現機制
+```typescript
+// 替換硬編碼映射為動態發現
+class AIAgentController {
+  private discoverAvailableActions(): Map<string, ActionDescriptor> {
+    const registry = this.controllerRegistry
+    const actions = new Map()
+    
+    // 動態掃描所有 Controllers 的可用動作
+    registry.getAllControllers().forEach(controller => {
+      controller.getSupportedActions().forEach(actionType => {
+        actions.set(actionType, {
+          controller: controller.getName(),
+          actionType,
+          requiresSelection: this.actionRequiresSelection(actionType)
+        })
+      })
+    })
+    
+    return actions
+  }
+}
+```
+
+#### 選項 3: Selection-Aware 建議系統
+```typescript
+// 基於當前選擇狀態提供智能建議
+class SelectionAwareSuggestionGenerator {
+  generateSuggestions(
+    behaviorAnalysis: string,
+    selectionData: SelectionData | null
+  ): AISuggestion[] {
+    if (selectionData?.isValidSelection) {
+      // 提供基於選擇的建議 (ADD_NOTE, ADD_HIGHLIGHT, ADD_COMMENT)
+      return this.generateSelectionBasedSuggestions(behaviorAnalysis, selectionData)
+    } else {
+      // 提供通用建議 (ADD_TO_BOOKMARK, CREATE_SUMMARY)
+      return this.generateGeneralSuggestions(behaviorAnalysis)
+    }
+  }
+}
+```
+
+**預計工作量:** 6-8 小時  
+**風險評估:** 中 - 需要跨多個組件協調，但不影響現有功能
+
+---
+
 ## 📈 技術債務指標
 
 ### 當前狀況
 - **總 FIXME:** 3 個
-- **總 TODO:** 4 個  
+- **總 TODO:** 6 個  
 - **總 HACK:** 0 個
 - **高優先級債務:** 1 個
-- **中優先級債務:** 1 個
+- **中優先級債務:** 2 個
 
 ### 目標
 - **下週目標:** 解決高優先級時序問題

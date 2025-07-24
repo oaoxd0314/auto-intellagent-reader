@@ -128,6 +128,15 @@ doc/
   - Why the workaround was needed
   - Planned resolution approach (if known)
 
+### Breaking Changes Policy:
+- **NO MIGRATION CODE**: When fixing type mismatches or API changes, directly update all affected files
+- **Trust TypeScript**: Let TypeScript compiler identify all places that need updates
+- **Clean Breaks**: Remove deprecated/unused code immediately, don't leave compatibility layers
+- **Examples**: 
+  - If changing interface, update all implementations at once
+  - If removing methods, delete all calls immediately
+  - If renaming, use IDE refactoring to update all references
+
 ### React Patterns:
 - Use function components and hooks only
 - Extract complex logic into custom hooks

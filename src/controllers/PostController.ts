@@ -32,7 +32,10 @@ export class PostController extends AbstractController {
         { type: 'ADD_REPLY', handler: this.addReply.bind(this), description: '添加回覆' },
         { type: 'REMOVE_INTERACTION', handler: this.removeInteraction.bind(this), description: '刪除互動記錄' },
         { type: 'CLEAR_INTERACTIONS', handler: this.clearInteractions.bind(this), description: '清除文章所有互動記錄' },
-        { type: 'ADD_TO_READING_HISTORY', handler: this.addToReadingHistory.bind(this), description: '添加到閱讀歷史' }
+        { type: 'ADD_TO_READING_HISTORY', handler: this.addToReadingHistory.bind(this), description: '添加到閱讀歷史' },
+        // AI 建議相關的 Mock Actions
+        { type: 'ADD_TO_BOOKMARK', handler: this.addToBookmarkAction.bind(this), description: '添加書籤 (Mock)' },
+        { type: 'CREATE_SUMMARY', handler: this.createSummaryAction.bind(this), description: '創建摘要 (Mock)' }
     ])
 
     constructor() {
@@ -353,5 +356,62 @@ export class PostController extends AbstractController {
      */
     getAllInteractions(): PostInteraction[] {
         return PostService.getAllInteractions()
+    }
+
+    // ===== AI 建議相關的 Mock Actions =====
+
+    /**
+     * 添加書籤 Action (Mock 實現)
+     */
+    private async addToBookmarkAction(payload?: { postId?: string }): Promise<void> {
+        try {
+            const postId = payload?.postId || 'current'
+            
+            // TODO: 實現真正的書籤功能
+            this.log(`Mock: Adding bookmark for post ${postId}`, payload)
+            
+            this.emit('bookmarkAdded', { 
+                postId,
+                timestamp: Date.now(),
+                mock: true 
+            })
+            
+            // 模擬異步操作
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '添加書籤失敗'
+            this.emit('bookmarkError', errorMessage)
+            throw error
+        }
+    }
+
+    /**
+     * 創建摘要 Action (Mock 實現)
+     */
+    private async createSummaryAction(payload?: { postId?: string; content?: string }): Promise<void> {
+        try {
+            const postId = payload?.postId || 'current'
+            
+            // TODO: 實現真正的摘要功能
+            this.log(`Mock: Creating summary for post ${postId}`, payload)
+            
+            const mockSummary = {
+                postId,
+                summary: '這是一個自動生成的文章摘要...',
+                timestamp: Date.now(),
+                mock: true
+            }
+            
+            this.emit('summaryCreated', mockSummary)
+            
+            // 模擬異步操作
+            await new Promise(resolve => setTimeout(resolve, 1000))
+            
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '創建摘要失敗'
+            this.emit('summaryError', errorMessage)
+            throw error
+        }
     }
 } 
