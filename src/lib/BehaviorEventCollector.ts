@@ -315,7 +315,7 @@ export class BehaviorEventCollector {
   /**
    * 設置事件過濾器 - 未來功能
    */
-  setEventFilter(filter: (controller: string, message: string, data?: any) => boolean): void {
+  setEventFilter(_filter: (controller: string, message: string, data?: any) => boolean): void {
     // 實作過濾器邏輯
   }
 

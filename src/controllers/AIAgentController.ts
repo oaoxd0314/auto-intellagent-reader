@@ -1,22 +1,23 @@
 import { AbstractController, createActionMap } from './AbstractController'
 import { useBehaviorStore, type BehaviorData } from '../stores/behaviorStore'
 import { AIAgentService } from '../services/AIAgentService'
+import { ControllerRegistry } from '../lib/ControllerRegistry'
 
 /**
- * AIAgentController - 純 Action Handler 實現
- * 專注於 AI 對話業務邏輯協調和事件發送
+ * AIAgentController - 負責行為分析和 AI 對話
+ * 
+ * 職責：
+ * - 分析用戶行為數據
+ * - 調用 AISuggestionController 生成建議
+ * - 通過 ControllerRegistry 與其他 Controller 通訊
  */
 export class AIAgentController extends AbstractController {
     private static instance: AIAgentController | null = null
-    private conversationHistory: Array<{ role: string; content: string }> = []
     private behaviorMonitoringInterval: NodeJS.Timeout | null = null
     private isMonitoringBehavior = false
 
     // Action 映射表
     private actionMap = createActionMap([
-        { type: 'SEND_MESSAGE', handler: this.sendMessageAction.bind(this), description: '發送消息' },
-        { type: 'CLEAR_CONVERSATION', handler: this.clearConversationAction.bind(this), description: '清理對話歷史' },
-        { type: 'GET_CONVERSATION_HISTORY', handler: this.getConversationHistoryAction.bind(this), description: '獲取對話歷史' },
         { type: 'ANALYZE_BEHAVIOR', handler: this.analyzeBehaviorAction.bind(this), description: '分析用戶行為並生成建議' },
         { type: 'START_BEHAVIOR_MONITORING', handler: this.startBehaviorMonitoringAction.bind(this), description: '開始行為監控' },
         { type: 'STOP_BEHAVIOR_MONITORING', handler: this.stopBehaviorMonitoringAction.bind(this), description: '停止行為監控' }
@@ -39,7 +40,6 @@ export class AIAgentController extends AbstractController {
     }
 
     protected onDestroy(): void {
-        this.conversationHistory = []
         this.stopBehaviorMonitoring()
         AIAgentController.instance = null
         this.log('AIAgentController destroyed')
@@ -52,7 +52,7 @@ export class AIAgentController extends AbstractController {
      */
     async executeAction(actionType: string, payload?: any): Promise<void> {
         const handler = this.actionMap[actionType]
-        
+
         if (!handler) {
             this.emit('actionError', {
                 actionType,
@@ -87,107 +87,12 @@ export class AIAgentController extends AbstractController {
     // ===== Action Handlers =====
 
     /**
-     * 發送消息 Action
-     */
-    private async sendMessageAction(payload: { userMessage: string; systemPrompt?: string }): Promise<void> {
-        try {
-            if (!payload.userMessage?.trim()) {
-                throw new Error('User message cannot be empty')
-            }
-
-            // 構建消息陣列
-            const messages: Array<{ role: string; content: string }> = []
-
-            // 添加系統提示
-            if (payload.systemPrompt) {
-                messages.push({ role: 'system', content: payload.systemPrompt })
-            }
-
-            // 添加對話歷史（保持最近 10 條）
-            const recentHistory = this.conversationHistory.slice(-10)
-            messages.push(...recentHistory)
-
-            // 添加當前用戶消息
-            messages.push({ role: 'user', content: payload.userMessage })
-
-            // 調用 AIAgentService 獲取真實 AI 回應
-            let response: string
-            try {
-                if (AIAgentService.isConfigured()) {
-                    response = await AIAgentService.sendMessage(messages)
-                } else {
-                    response = `模擬 AI 回應: ${payload.userMessage}`
-                    this.log('AIAgentService not configured, using mock response')
-                }
-            } catch (error) {
-                this.log('AIAgentService error, using fallback response', error)
-                response = `AI 回應 (fallback): ${payload.userMessage}`
-            }
-
-            // 更新對話歷史
-            this.conversationHistory.push(
-                { role: 'user', content: payload.userMessage },
-                { role: 'assistant', content: response }
-            )
-
-            // 限制歷史長度
-            if (this.conversationHistory.length > 20) {
-                this.conversationHistory = this.conversationHistory.slice(-20)
-            }
-
-            this.emit('messageReceived', {
-                userMessage: payload.userMessage,
-                assistantResponse: response,
-                conversationHistory: [...this.conversationHistory]
-            })
-            
-            this.log(`Message processed: "${payload.userMessage.substring(0, 50)}..."`)
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to send message'
-            this.emit('messageError', errorMessage)
-            throw error
-        }
-    }
-
-    /**
-     * 清理對話歷史 Action
-     */
-    private async clearConversationAction(): Promise<void> {
-        try {
-            this.conversationHistory = []
-            this.emit('conversationCleared')
-            this.log('Conversation history cleared')
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to clear conversation'
-            this.emit('conversationError', errorMessage)
-            throw error
-        }
-    }
-
-    /**
-     * 獲取對話歷史 Action
-     */
-    private async getConversationHistoryAction(): Promise<void> {
-        try {
-            const history = [...this.conversationHistory]
-            this.emit('conversationHistoryLoaded', history)
-            this.log(`Conversation history loaded: ${history.length} messages`)
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Failed to load conversation history'
-            this.emit('conversationError', errorMessage)
-            throw error
-        }
-    }
-
-    // ===== 輔助方法 (不是 Action Handlers) =====
-
-    /**
      * 分析用戶行為並生成建議 Action
      */
     private async analyzeBehaviorAction(payload?: { customPrompt?: string }): Promise<void> {
         try {
             const behaviorData = useBehaviorStore.getState().getBehaviorData()
-            
+
             if (behaviorData.recentEvents.length === 0) {
                 this.emit('behaviorAnalysisEmpty', { message: '暫無行為數據可分析' })
                 this.log('No behavior data available for analysis')
@@ -196,30 +101,70 @@ export class AIAgentController extends AbstractController {
 
             // 構建行為分析提示
             const behaviorPrompt = this.createBehaviorAnalysisPrompt(behaviorData, payload?.customPrompt)
-            
+
             let analysisResult: string
+            let aiInsights: any = null
+
+            // 第一步：AI 分析（如果配置了 API）
             if (AIAgentService.isConfigured()) {
-                const messages = [
-                    { role: 'system', content: behaviorPrompt },
-                    { role: 'user', content: '請分析我的閱讀行為並提供建議' }
-                ]
-                analysisResult = await AIAgentService.sendMessage(messages, {
-                    temperature: 0.3,
-                    maxTokens: 800
-                })
+                try {
+                    this.log('Using AI service for behavior analysis')
+                    const messages = [
+                        { role: 'system', content: behaviorPrompt },
+                        { role: 'user', content: '請分析我的閱讀行為並提供洞察' }
+                    ]
+                    analysisResult = await AIAgentService.sendMessage(messages, {
+                        temperature: 0.3,
+                        maxTokens: 800
+                    })
+
+                    console.log('🤖 [AI Agent] 行為分析結果:', analysisResult)
+
+                    // 嘗試解析 AI 回應中的結構化信息
+                    aiInsights = this.parseAIInsights(analysisResult)
+                    this.log('AI analysis completed with insights', aiInsights)
+                } catch (error) {
+                    this.log('AI service failed, falling back to mock analysis', error)
+                    analysisResult = this.generateMockBehaviorAnalysis(behaviorData)
+                }
             } else {
+                this.log('AI service not configured, using mock analysis')
                 analysisResult = this.generateMockBehaviorAnalysis(behaviorData)
             }
+
+            // 第二步：基於 AI 分析結果，通過規則引擎生成具體建議
+            const registry = ControllerRegistry.getInstance()
+            await registry.executeAction('AISuggestionController', 'GENERATE_SUGGESTIONS', {
+                behaviorData,
+                context: {
+                    userBehavior: {
+                        pattern: behaviorData.userPattern.type,
+                        confidence: behaviorData.userPattern.confidence,
+                        eventCount: behaviorData.sessionData.eventCount,
+                        focusAreas: behaviorData.userPattern.focus_areas
+                    },
+                    aiAnalysis: {
+                        summary: analysisResult,
+                        insights: aiInsights,
+                        confidence: AIAgentService.isConfigured() ? 'high' : 'medium',
+                        source: AIAgentService.isConfigured() ? 'llm' : 'rule_based'
+                    }
+                }
+            })
 
             this.emit('behaviorAnalysisCompleted', {
                 behaviorData,
                 analysis: analysisResult,
-                timestamp: Date.now()
+                aiInsights,
+                timestamp: Date.now(),
+                hasAIInsights: !!aiInsights
             })
-            
-            this.log('Behavior analysis completed', { 
+
+            this.log('Behavior analysis completed and suggestions generated', {
                 eventCount: behaviorData.recentEvents.length,
-                pattern: behaviorData.userPattern.type 
+                pattern: behaviorData.userPattern.type,
+                hasAIInsights: !!aiInsights,
+                source: AIAgentService.isConfigured() ? 'llm' : 'rule_based'
             })
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to analyze behavior'
@@ -234,7 +179,7 @@ export class AIAgentController extends AbstractController {
     private async startBehaviorMonitoringAction(payload?: { interval?: number }): Promise<void> {
         try {
             const interval = payload?.interval || 30000 // 預設 30 秒
-            
+
             if (this.isMonitoringBehavior) {
                 this.log('Behavior monitoring already active')
                 return
@@ -311,7 +256,7 @@ export class AIAgentController extends AbstractController {
      */
     private generateMockBehaviorAnalysis(behaviorData: BehaviorData): string {
         const { userPattern } = behaviorData
-        
+
         console.log('🤖 [AI Agent Mock] 開始模擬行為分析...')
         console.log('📊 [AI Agent Mock] 行為數據:', {
             模式: userPattern.type,
@@ -321,10 +266,10 @@ export class AIAgentController extends AbstractController {
             焦點區域: userPattern.focus_areas,
             最近事件: behaviorData.recentEvents.slice(-3)
         })
-        
+
         let analysis: string
         let suggestions: string[] = []
-        
+
         switch (userPattern.type) {
             case 'scanning':
                 analysis = '🔍 分析結果：您正在快速瀏覽內容，屬於掃描模式。'
@@ -357,24 +302,62 @@ export class AIAgentController extends AbstractController {
                     '🔄 多嘗試不同的閱讀方式'
                 ]
         }
-        
+
         const fullAnalysis = `${analysis}\n\n💡 智能建議：\n${suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n⭐ 基於您的閱讀模式，建議保持當前節奏並適時調整策略。`
-        
+
         console.log('✨ [AI Agent Mock] 模擬分析完成!')
         console.log('💬 [AI Agent Mock] 生成建議:', fullAnalysis)
-        
+
         // 模擬 AI 處理時間 (1-3秒)
         const processingTime = Math.random() * 2000 + 1000
         console.log(`⏱️ [AI Agent Mock] 模擬處理時間: ${Math.round(processingTime)}ms`)
-        
+
         return fullAnalysis
     }
 
     /**
-     * 獲取對話歷史 - 同步方法
+     * 解析 AI 回應中的結構化洞察
      */
-    getConversationHistory(): Array<{ role: string; content: string }> {
-        return [...this.conversationHistory]
+    private parseAIInsights(aiResponse: string): any {
+        try {
+            // 嘗試從 AI 回應中提取結構化信息
+            // 這裡可以實現更複雜的 NLP 解析邏輯
+
+            const insights = {
+                suggestedActions: [] as string[],
+                userMood: 'neutral',
+                confidenceLevel: 0.7,
+                recommendations: [] as string[]
+            }
+
+            // 簡單的關鍵詞解析邏輯
+            if (aiResponse.includes('收藏') || aiResponse.includes('書籤')) {
+                insights.suggestedActions.push('bookmark')
+            }
+            if (aiResponse.includes('筆記') || aiResponse.includes('記錄')) {
+                insights.suggestedActions.push('note')
+            }
+            if (aiResponse.includes('標記') || aiResponse.includes('重點')) {
+                insights.suggestedActions.push('highlight')
+            }
+            if (aiResponse.includes('摘要') || aiResponse.includes('總結')) {
+                insights.suggestedActions.push('summary')
+            }
+
+            // 情緒分析
+            if (aiResponse.includes('專注') || aiResponse.includes('深度')) {
+                insights.userMood = 'focused'
+                insights.confidenceLevel = 0.8
+            } else if (aiResponse.includes('快速') || aiResponse.includes('瀏覽')) {
+                insights.userMood = 'scanning'
+                insights.confidenceLevel = 0.6
+            }
+
+            return insights
+        } catch (error) {
+            this.log('Failed to parse AI insights', error)
+            return null
+        }
     }
 
     /**

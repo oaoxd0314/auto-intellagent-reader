@@ -9,7 +9,7 @@ import {
   ToastTitle,
 } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
-import type { AISuggestion, UserResponse, UserResponseAction } from "@/types/suggestion"
+import type { AISuggestion, UserResponseAction } from "@/types/suggestion"
 import { cn } from "@/lib/utils"
 
 interface AISuggestionToastProps {
@@ -17,23 +17,15 @@ interface AISuggestionToastProps {
   onAccept: (suggestion: AISuggestion) => void
   onReject: (suggestion: AISuggestion) => void  
   onDismiss: (suggestion: AISuggestion) => void
-  autoHideDelay?: number // 默認 8000ms
 }
 
 export function AISuggestionToast({
   suggestion,
   onAccept,
   onReject,
-  onDismiss,
-  autoHideDelay = 8000
+  onDismiss
 }: AISuggestionToastProps) {
   const handleUserResponse = React.useCallback((action: UserResponseAction) => {
-    const response: UserResponse = {
-      suggestionId: suggestion.id,
-      action,
-      timestamp: Date.now()
-    }
-
     switch (action) {
       case 'accept':
         onAccept(suggestion)
@@ -126,11 +118,27 @@ export function AISuggestionToast({
       {/* Debug info (development only) */}
       {process.env.NODE_ENV === 'development' && (
         <div className="text-xs text-muted-foreground opacity-60 pt-1 border-t">
-          ID: {suggestion.id.substring(0, 8)}... | Action: {suggestion.actionString}
+          ID: {suggestion.id.substring(0, 8)}... | Action: {suggestion.actionType}
         </div>
       )}
     </Toast>
   )
+}
+
+/**
+ * 根據建議優先級獲取智能顯示時長
+ */
+function getSmartDuration(priority: AISuggestion['priority']): number {
+  switch (priority) {
+    case 'high':
+      return 12000 // 12秒 - 高優先級需要更多時間考慮
+    case 'medium':
+      return 8000  // 8秒 - 標準時長
+    case 'low':
+      return 6000  // 6秒 - 低優先級可以更快消失
+    default:
+      return 8000
+  }
 }
 
 // 便利函數：顯示 AI 建議 Toast
@@ -140,6 +148,9 @@ export function showAISuggestionToast(
     onAccept: (suggestion: AISuggestion) => void
     onReject: (suggestion: AISuggestion) => void  
     onDismiss: (suggestion: AISuggestion) => void
+  },
+  options?: {
+    customDuration?: number // 可選的自定義顯示時長
   }
 ) {
   const getPriorityIcon = () => {
@@ -155,10 +166,13 @@ export function showAISuggestionToast(
     }
   }
 
+  // 使用自定義時長或智能時長
+  const duration = options?.customDuration ?? getSmartDuration(suggestion.priority)
+
   return toast({
     title: `${getPriorityIcon()} AI 建議`,
     description: suggestion.description,
-    duration: 8000, // 8 秒
+    duration, // 使用智能計算的時長
     action: (
       <div className="flex space-x-2">
         <ToastAction 

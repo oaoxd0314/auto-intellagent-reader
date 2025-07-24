@@ -17,7 +17,9 @@ export class InteractionController extends AbstractController {
         { type: 'EDIT_REPLY', handler: this.editReplyAction.bind(this), description: '編輯回覆' },
         { type: 'GET_INTERACTIONS', handler: this.getInteractionsAction.bind(this), description: '獲取互動記錄' },
         { type: 'GET_STATS', handler: this.getStatsAction.bind(this), description: '獲取互動統計' },
-        { type: 'CLEAR_POST_INTERACTIONS', handler: this.clearPostInteractionsAction.bind(this), description: '清空文章互動' }
+        { type: 'CLEAR_POST_INTERACTIONS', handler: this.clearPostInteractionsAction.bind(this), description: '清空文章互動' },
+        // AI 建議相關的 Mock Actions
+        { type: 'ADD_NOTE', handler: this.addNoteAction.bind(this), description: '添加筆記 (Mock)' }
     ])
 
     // 單例模式
@@ -327,6 +329,53 @@ export class InteractionController extends AbstractController {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Failed to clear interactions'
             this.emit('interactionError', errorMessage)
+            throw error
+        }
+    }
+
+    // ===== AI 建議相關的 Mock Actions =====
+
+    /**
+     * 添加筆記 Action (Mock 實現)
+     * TODO: 實現真正的筆記功能，包含 sectionId 和 selectedText 參數
+     * TODO: 整合 useSelectionSection.ts 來獲取正確的 section ID
+     */
+    private async addNoteAction(payload: {
+        postId: string
+        sectionId: string
+        selectedText: string
+        content: string
+    }): Promise<void> {
+        try {
+            // 業務驗證
+            if (!payload.postId?.trim() || !payload.sectionId?.trim()) {
+                throw new Error('Post ID and section ID are required')
+            }
+
+            if (!payload.content?.trim()) {
+                throw new Error('Note content cannot be empty')
+            }
+
+            if (payload.content.length > 2000) {
+                throw new Error('Note content is too long (max 2000 characters)')
+            }
+
+            const note: PostInteraction = {
+                id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                postId: payload.postId,
+                type: 'comment', // 使用 comment 類型作為筆記
+                content: payload.content.trim(),
+                selectedText: payload.selectedText?.trim(),
+                position: { start: 0, end: 0, sectionId: payload.sectionId },
+                timestamp: new Date().toISOString()
+            }
+
+            this.emit('noteAdded', note)
+            this.emit('interactionAdded', note)
+            this.log(`Note added to post ${payload.postId}, section ${payload.sectionId}`)
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to add note'
+            this.emit('noteError', errorMessage)
             throw error
         }
     }
