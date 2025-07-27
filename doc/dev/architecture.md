@@ -1,12 +1,10 @@
-# 🏗️ AI Agent 架構設計
-
-> ⚠️ **重要**: 本文檔已更新為 AI Agent 架構。採用簡潔的三層架構為 SuperController 做準備。
+# 🏗️ 系統架構設計
 
 ## 📋 架構概覽
 
 本專案採用 **Event-Driven Action Handler 架構**，已完成重構並為 AI Agent SuperController 做好準備。每層職責單一清晰，使用統一的 executeAction 模式和 Command Pattern。
 
-### 🎯 核心架構 ✅ 已實現
+### 🎯 核心架構
 
 ```
 Hook Layer (UI 抽象) ↔ Controller Layer (Action Handler) ↔ Services Layer (數據)
@@ -14,10 +12,11 @@ Hook Layer (UI 抽象) ↔ Controller Layer (Action Handler) ↔ Services Layer 
                Context (可選的 Global Store)
 
 實際運行狀況:
-- ✅ 22 個 Actions 可用
-- ✅ 3 個 Controllers 註冊完成
+- ✅ 22 個 Actions 可用 (PostController: 11個, InteractionController: 6個, AIAgentController: 5個)
+- ✅ 3 個 Controllers 完全重構為純 Action Handler
 - ✅ Event-Driven 事件系統正常運行
-- ✅ ControllerRegistry 統一管理
+- ✅ ControllerRegistry 統一管理和調度
+- ✅ 所有 Controllers 實現統一 executeAction 介面
 ```
 
 ## 🤖 AI Agent 控制流程
@@ -49,30 +48,7 @@ AI Agent (字串指令)
 - **📊 狀態監控**: 提供 Controller 狀態、Action 列表等管理信息
 - **🔧 生命週期管理**: 統一的初始化和銷毀流程
 
-```typescript
-// ControllerRegistry 使用範例
-const registry = ControllerRegistry.getInstance()
-
-// 發現所有可用 Actions
-const discoveries = registry.discoverAllActions()
-// 結果: [
-//   { controllerName: 'PostController', actions: ['LOAD_POSTS', 'SEARCH_POSTS', ...] },
-//   { controllerName: 'AIAgentController', actions: ['ANALYZE_BEHAVIOR', ...] }
-// ]
-
-// 統一執行 Action
-await registry.executeAction('PostController', 'LOAD_POST', { id: 'example' })
-await registry.executeAction('AIAgentController', 'ANALYZE_BEHAVIOR')
-```
-
-### 核心元件說明
-
-- **AI Agent**: 產生字串指令，如 `"ADD_TASK title=\"Buy milk\""`
-- **SuperController**: 解析指令 → 建立 Command 物件 → 根據策略執行
-- **Controller Facade**: 統一介面，內部調用具體 Controller 或 Service
-- **ApplyPolicy**: 執行策略 (DirectApplyPolicy / ToastPolicy)
-
-### 🎯 核心設計模式
+## 🎯 核心設計模式
 
 | Pattern | 目的 | 適用部位 |
 |---------|------|----------|
@@ -81,77 +57,9 @@ await registry.executeAction('AIAgentController', 'ANALYZE_BEHAVIOR')
 | **Mediator Pattern** | 集中協調多元件互動，避免彼此耦合 | SuperController |
 | **Strategy Pattern** | 把「如何執行 Command」抽離為可插拔策略 | ApplyPolicy (直接 / Toast) |
 
-### 🔄 資料流向
+## 🏛️ 分層架構詳解
 
-**現狀流程** (UI 主導):
-```
-UI → Hook → Controller → Services
-```
-
-**未來 AI Agent 流程** (Agent 主導):
-```
-AI Agent → SuperController → xxxController.executeAction() → Services
-```
-
-**最終混合流程** (共存):
-```
-UI → Hook → Controller.executeAction() ← SuperController ← AI Agent
-                ↓
-            Services
-```
-
-### 🏛️ 簡潔三層架構 + 橫切關注點
-
-```
-┌─────────────────────────────────────────────────┐
-│                  UI Layer                       │
-│    ┌─────────┐ ┌─────────┐ ┌─────────┐          │
-│    │  Pages  │ │Components│ │ Layouts │          │
-│    └─────────┘ └─────────┘ └─────────┘          │
-└─────────────────────┬───────────────────────────┘
-                      │ 只調用 Hook
-┌─────────────────────▼───────────────────────────┐
-│               Hook Layer (UI 抽象)               │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │ 本地UI狀態   │ │ Controller  │ │ 事件監聽     │ │
-│  │    管理      │ │   調用      │ │   處理      │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ │
-└─────────────────────┬───────────────────────────┘
-                      │ 調用 executeAction
-┌─────────────────────▼───────────────────────────┐
-│           Controller Layer (Action Handler)     │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │  Action     │ │    事件      │ │ 業務邏輯     │ │ 
-│  │   處理      │ │   發送      │ │   協調      │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ │
-└─────────────────────┬───────────────────────────┘
-                      │ 調用數據操作
-┌─────────────────────▼───────────────────────────┐
-│             Services Layer (數據)                │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │   數據      │ │    緩存      │ │   持久化     │ │
-│  │  獲取      │ │   管理      │ │    操作     │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ │
-└─────────────────────────────────────────────────┘
-
-              ┌─────────────────────┐
-              │  Context (可選)      │
-              │                     │
-              │  主題、用戶狀態       │
-              │  全域通知等          │
-              └─────────────────────┘
-
-              ┌─────────────────────┐
-              │  橫切關注點抽象層     │ ✨ NEW
-              │                     │
-              │  BehaviorEventCollector │
-              │  (事件收集/格式化)    │
-              └─────────────────────┘
-```
-
-## 🎭 各層詳細職責
-
-### 1. **UI Layer (純渲染層)**
+### **UI Layer (純渲染層)**
 
 **職責：** 純渲染邏輯，只調用 Hook  
 **原則：** 不直接接觸 Controller、Context、Service
@@ -185,16 +93,9 @@ function PostDetailPage() {
     </div>
   )
 }
-
-// ❌ 避免：UI 直接操作其他層
-function BadComponent() {
-  const controller = PostController.getInstance()  // ❌ 不應該直接調用
-  const context = usePostContext()                // ❌ 不應該直接調用  
-  const posts = PostService.getAllPosts()         // ❌ 絕對不可以
-}
 ```
 
-### 2. **Hook Layer (UI 抽象)**
+### **Hook Layer (UI 抽象)**
 
 **職責：** 管理 UI 本地狀態 + 調用 Controller actions  
 **原則：** 為 UI 提供簡潔接口，封裝所有複雜性
@@ -239,60 +140,22 @@ function usePostDetail(id: string) {
   
   return { post, loading, error, loadPost }
 }
-
-function useCommentSection(postId: string) {
-  const [comments, setComments] = useState<Comment[]>([])
-  const [newComment, setNewComment] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  
-  const controller = PostController.getInstance()
-  
-  useEffect(() => {
-    const handleCommentAdded = (comment: Comment) => {
-      setComments(prev => [...prev, comment])
-      setSubmitting(false)
-    }
-    
-    controller.on('commentAdded', handleCommentAdded)
-    return () => controller.off('commentAdded', handleCommentAdded)
-  }, [controller])
-  
-  const submitComment = useCallback(() => {
-    if (!newComment.trim()) return
-    
-    setSubmitting(true)
-    controller.executeAction('ADD_COMMENT', { 
-      postId, 
-      content: newComment 
-    })
-    setNewComment('')
-  }, [controller, postId, newComment])
-  
-  return {
-    comments,
-    newComment,
-    setNewComment,
-    submitComment,
-    submitting
-  }
-}
 ```
 
-### 3. **Controller Layer (純 Action Handler)**
+### **Controller Layer (純 Action Handler)**
 
 **職責：** 純 Action 處理 + 事件發送 + 業務邏輯協調  
 **原則：** 無狀態，通過事件通知狀態變更
 
 ```typescript
 class PostController extends AbstractController {
-    // Action 映射表 - 放在外部便於維護
-    private actionMap = {
-        'LOAD_POSTS': this.loadPosts.bind(this),
-        'LOAD_POST': this.loadPost.bind(this),
-        'SEARCH_POSTS': this.searchPosts.bind(this),
-        'ADD_COMMENT': this.addComment.bind(this),
-        'ADD_TO_READING_HISTORY': this.addToHistory.bind(this)
-    }
+    // Action 映射表
+    private actionMap = createActionMap([
+        { type: 'LOAD_POSTS', handler: this.loadPosts.bind(this), description: '載入所有文章' },
+        { type: 'LOAD_POST', handler: this.loadPost.bind(this), description: '載入指定文章' },
+        { type: 'SEARCH_POSTS', handler: this.searchPosts.bind(this), description: '搜尋文章' },
+        { type: 'ADD_COMMENT', handler: this.addComment.bind(this), description: '新增評論' }
+    ])
     
     /**
      * 統一 Action 處理入口 - 為 SuperController 準備
@@ -326,70 +189,10 @@ class PostController extends AbstractController {
     getSupportedActions(): string[] {
         return Object.keys(this.actionMap)
     }
-    
-    // ===== Action Handlers =====
-    
-    private async loadPosts(payload?: { forceRefresh?: boolean }) {
-        try {
-            const posts = await PostService.getAllPosts(payload?.forceRefresh)
-            this.emit('postsLoaded', posts)
-        } catch (error) {
-            this.emit('postsError', error.message)
-        }
-    }
-    
-    private async loadPost(payload: { id: string }) {
-        try {
-            const post = await PostService.getPostById(payload.id)
-            if (post) {
-                this.emit('postLoaded', post)
-                // 業務邏輯：自動添加到閱讀歷史
-                PostService.addToReadingHistory(post)
-            } else {
-                this.emit('postError', 'Post not found')
-            }
-        } catch (error) {
-            this.emit('postError', error.message)
-        }
-    }
-    
-    private async searchPosts(payload: { query: string, filters?: SearchFilters }) {
-        try {
-            const allPosts = await PostService.getAllPosts()
-            const results = PostService.searchPosts(payload.query, allPosts, payload.filters)
-            this.emit('searchCompleted', results)
-        } catch (error) {
-            this.emit('searchError', error.message)
-        }
-    }
-    
-    private async addComment(payload: { postId: string, content: string }) {
-        try {
-            // 業務驗證
-            if (payload.content.trim().length < 3) {
-                throw new Error('Comment too short')
-            }
-            
-            // 調用 Service 保存
-            const comment = await PostService.addComment(payload.postId, payload.content)
-            this.emit('commentAdded', comment)
-        } catch (error) {
-            this.emit('commentError', error.message)
-        }
-    }
-    
-    private async addToHistory(payload: { post: Post }) {
-        try {
-            PostService.addToReadingHistory(payload.post)
-            this.emit('readingHistoryUpdated', payload.post)
-        } catch (error) {
-            this.emit('historyError', error.message)
-        }
-    }
 }
 ```
 
-### 4. **Services Layer (數據 + 緩存 + 持久化)**
+### **Services Layer (數據 + 緩存 + 持久化)**
 
 **職責：** 所有數據操作、緩存管理、持久化處理  
 **原則：** 承擔從 Controller 搬移過來的所有數據邏輯
@@ -427,292 +230,8 @@ class PostService {
             throw error
         }
     }
-    
-    /**
-     * 獲取單個文章 - 包含緩存邏輯
-     */
-    static async getPostById(id: string): Promise<Post | null> {
-        // 檢查緩存
-        if (this.cache.has(id)) {
-            return this.cache.get(id)!
-        }
-        
-        try {
-            const post = await MarkdownFactory.loadPostById(id)
-            if (post) {
-                this.cache.set(id, post)
-            }
-            return post || null
-        } catch (error) {
-            console.error(`Failed to load post ${id}:`, error)
-            throw error
-        }
-    }
-    
-    /**
-     * 搜索文章 - 業務邏輯
-     */
-    static searchPosts(query: string, posts: Post[], filters?: SearchFilters): Post[] {
-        let results = posts.filter(post => {
-            const matchesQuery = post.title.toLowerCase().includes(query.toLowerCase()) ||
-                               post.content?.toLowerCase().includes(query.toLowerCase())
-            
-            const matchesTag = !filters?.tag || post.tags?.includes(filters.tag)
-            const matchesAuthor = !filters?.author || post.author === filters.author
-            
-            return matchesQuery && matchesTag && matchesAuthor
-        })
-        
-        // 排序邏輯
-        if (filters?.sortBy === 'relevance') {
-            results = this.sortByRelevance(results, query)
-        } else if (filters?.sortBy === 'date') {
-            results = results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        }
-        
-        return results
-    }
-    
-    /**
-     * 添加評論 - 持久化操作
-     */
-    static async addComment(postId: string, content: string): Promise<Comment> {
-        const comment = {
-            id: `comment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            postId,
-            content: content.trim(),
-            createdAt: new Date().toISOString(),
-            type: 'comment' as const
-        }
-        
-        // 保存到 localStorage
-        const comments = this.loadComments()
-        comments.push(comment)
-        this.saveComments(comments)
-        
-        return comment
-    }
-    
-    /**
-     * 閱讀歷史管理 - 持久化操作
-     */
-    static addToReadingHistory(post: Post): void {
-        const history = this.getReadingHistory()
-        const existingIndex = history.findIndex(item => item.postId === post.id)
-        
-        const historyItem = {
-            postId: post.id,
-            title: post.title,
-            readAt: new Date().toISOString(),
-            readCount: existingIndex >= 0 ? history[existingIndex].readCount + 1 : 1
-        }
-        
-        if (existingIndex >= 0) {
-            history[existingIndex] = historyItem
-        } else {
-            history.unshift(historyItem)
-        }
-        
-        // 只保留最近 50 條記錄
-        const trimmedHistory = history.slice(0, 50)
-        localStorage.setItem('reading-history', JSON.stringify(trimmedHistory))
-    }
-    
-    static getReadingHistory(): Array<{
-        postId: string
-        title: string  
-        readAt: string
-        readCount: number
-    }> {
-        try {
-            const history = localStorage.getItem('reading-history')
-            return history ? JSON.parse(history) : []
-        } catch {
-            return []
-        }
-    }
-    
-    // ===== 私有方法 =====
-    
-    private static isCacheValid(): boolean {
-        return this.lastFetched !== null && 
-               Date.now() - this.lastFetched < this.cacheTimeout
-    }
-    
-    private static sortByRelevance(posts: Post[], query: string): Post[] {
-        return posts.map(post => ({
-            post,
-            score: this.calculateRelevanceScore(post, query)
-        }))
-        .sort((a, b) => b.score - a.score)
-        .map(item => item.post)
-    }
-    
-    private static calculateRelevanceScore(post: Post, query: string): number {
-        const titleMatch = post.title.toLowerCase().includes(query.toLowerCase()) ? 2 : 0
-        const contentMatch = post.content?.toLowerCase().includes(query.toLowerCase()) ? 1 : 0
-        return titleMatch + contentMatch
-    }
-    
-    private static loadComments(): Comment[] {
-        try {
-            const comments = localStorage.getItem('post-comments')
-            return comments ? JSON.parse(comments) : []
-        } catch {
-            return []
-        }
-    }
-    
-    private static saveComments(comments: Comment[]): void {
-        try {
-            localStorage.setItem('post-comments', JSON.stringify(comments))
-        } catch (error) {
-            console.error('Failed to save comments:', error)
-        }
-    }
 }
 ```
-
-### 5. **Context Layer (可選的 Global Store)**
-
-**職責：** 只存儲需要跨組件共享的簡單狀態  
-**原則：** 不包含業務邏輯，純狀態存儲
-
-```typescript
-// 只在真正需要全域狀態時使用
-interface GlobalState {
-    // 主題設定
-    theme: 'light' | 'dark'
-    
-    // 用戶狀態  
-    user: {
-        id: string
-        name: string
-        preferences: UserPreferences
-    } | null
-    
-    // 全域通知
-    notifications: Array<{
-        id: string
-        message: string
-        type: 'success' | 'error' | 'info'
-        timestamp: number
-    }>
-}
-
-const GlobalContext = createContext<{
-    state: GlobalState
-    setState: (updates: Partial<GlobalState>) => void
-}>()
-
-// 使用範例：只在需要時使用
-function App() {
-    const { theme } = useGlobalContext()
-    
-    return (
-        <div className={theme === 'dark' ? 'dark' : 'light'}>
-            {/* 不需要在這裡處理文章數據 */}
-        </div>
-    )
-}
-```
-
-### 6. **橫切關注點抽象層 (Cross-Cutting Concerns)** ✨
-
-**職責：** 處理跨越多個層級的橫切關注點，提供解耦的抽象接口  
-**原則：** 降低層級間的直接耦合，專注單一橫切關注點
-
-#### **BehaviorEventCollector - 事件收集抽象層**
-
-**設計目的：** 為 AI Agent 提供統一的行為事件收集接口，同時避免 Controller 層直接依賴 Zustand Store
-
-```typescript
-// src/lib/BehaviorEventCollector.ts
-export class BehaviorEventCollector {
-    private static instance: BehaviorEventCollector | null = null
-
-    static getInstance(): BehaviorEventCollector {
-        if (!this.instance) {
-            this.instance = new BehaviorEventCollector()
-        }
-        return this.instance
-    }
-
-    /**
-     * 收集 Controller 事件 - 統一入口
-     */
-    collectControllerEvent(controller: string, message: string, data?: any): void {
-        const eventLog = this.createEventLog(controller, message, data)
-        // 內部使用 store，外部不知道實現細節
-        useBehaviorStore.getState().collectEvent(eventLog)
-    }
-
-    /**
-     * 行為收集狀態管理
-     */
-    startCollecting(postId: string): void {
-        useBehaviorStore.getState().startCollecting(postId)
-    }
-
-    stopCollecting(): void {
-        useBehaviorStore.getState().stopCollecting()
-    }
-
-    /**
-     * 獲取行為數據 - 提供統一接口
-     */
-    getBehaviorData() {
-        return useBehaviorStore.getState().getBehaviorData()
-    }
-
-    /**
-     * 事件格式化 Factory - 統一事件日誌格式
-     */
-    private createEventLog(controller: string, message: string, data?: any): string {
-        const timestamp = Date.now()
-        const dataStr = data ? JSON.stringify(data) : ''
-        return `${timestamp}|${controller}|${message}|${dataStr}`
-    }
-
-    /**
-     * 未來擴展點：過濾、批處理、發送到服務器等
-     */
-    private shouldCollectEvent(controller: string, message: string): boolean {
-        // 可以在這裡加入過濾邏輯
-        return true
-    }
-}
-
-// 導出單例實例供全局使用
-export const behaviorEventCollector = BehaviorEventCollector.getInstance()
-```
-
-**整合方式：**
-```typescript
-// AbstractController.ts 中使用
-import { behaviorEventCollector } from '../lib/BehaviorEventCollector'
-
-protected log(message: string, data?: any): void {
-    if (process.env.NODE_ENV === 'development') {
-        const prefix = `[${this.name}]`
-        if (data !== undefined) {
-            console.log(prefix, message, data)
-        } else {
-            console.log(prefix, message)
-        }
-
-        // 通過抽象層收集事件 - 完全不知道底層 store 實現
-        behaviorEventCollector.collectControllerEvent(this.name, message, data)
-    }
-}
-```
-
-**架構優勢：**
-- ✅ **降低耦合**: AbstractController 不依賴 zustand 或具體 store 實現
-- ✅ **統一接口**: 所有事件收集都通過這一層，格式標準化
-- ✅ **易於替換**: 想換底層存儲只需改 EventCollector 內部實現
-- ✅ **符合 SOLID**: 單一職責、開放封閉、依賴反轉原則
-- ✅ **未來擴展**: 可加入過濾、批處理、遠程發送等功能
 
 ## 🔄 數據流運作機制
 
@@ -738,7 +257,7 @@ protected log(message: string, data?: any): void {
 7. UI 重新渲染
 ```
 
-## 🎯 簡化架構優勢
+## 🎯 架構優勢
 
 ### **1. 極簡的 UI 開發體驗**
 - ✅ UI 只需要學會調用 Hook
@@ -769,4 +288,4 @@ protected log(message: string, data?: any): void {
 
 ---
 
-💡 **核心理念**: 簡潔三層架構，Context 作為可選全域存儲，為 AI Agent SuperController 做完美準備。 
+💡 **核心理念**: 簡潔三層架構，Context 作為可選全域存儲，為 AI Agent SuperController 做完美準備。

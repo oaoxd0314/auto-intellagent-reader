@@ -133,6 +133,49 @@ VITE_OPENROUTER_MODEL=openai/gpt-4o-mini
 
 **🎉 系統已完全準備就緒，立即體驗智能閱讀助手！**
 
+
+## 🚀 Library 化發展方向
+
+**🎯 專案定位轉型**: 從 POC 轉向 **AI-First Behavior Intelligence Library**
+
+### 📋 轉型決策
+基於 [Claude Code 架構分析](https://github.com/shareAI-lab/analysis_claude_code) 的優秀設計理念，我們決定將此專案轉換為可重用的智能行為分析 Library：
+
+- ✅ **POC 驗證成功** - 當前架構已證明 AI 行為分析 + 智能建議的可行性
+- ✅ **明確複用需求** - 有其他專案的實際整合計劃
+- ✅ **差異化價值** - AI-First 行為智能，超越傳統的事件追蹤方案
+
+### 🏗️ Library 架構願景
+```typescript
+// 未來的 Library API 設計
+export function createIntelligentApp(config: {
+  name: string
+  ai: { provider: 'claude' | 'openai' | 'openrouter' }
+  behaviors: BehaviorDefinition[]
+  actions: ActionDefinition[]
+}) {
+  return {
+    tracker: createContextualTracker(config.behaviors),
+    agent: createIntelligentAgent(config.ai),
+    registry: createActionRegistry(config.actions),
+    ui: createReactComponents(config)
+  }
+}
+```
+
+### 📚 相關文檔
+- **[Library 化決策記錄](./doc/spec/library-transformation-decision.md)** - 完整的轉型決策和實施計劃
+- **[架構設計理念](./doc/spec/ai-behavior-system.md)** - 基於 Claude Code 的設計思考
+- **[實施路線圖](./doc/spec/ai-behavior-roadmap.md)** - 具體的開發時程和里程碑
+
+---
+
+## Reference Architecture
+
+- https://zenn.dev/gotalab/articles/3db0621ce3d6d2
+- https://github.com/GitYCC/context-engineering-intro-zh
+- **https://github.com/shareAI-lab/analysis_claude_code** - Claude Code 架構分析 (主要設計靈感)
+
 ---
 
 MIT License

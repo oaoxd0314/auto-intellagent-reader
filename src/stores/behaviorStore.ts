@@ -135,18 +135,45 @@ export const useBehaviorStore = create<BehaviorStore>()(
           const { controllerEvents, sessionStart } = state
           const duration = Date.now() - sessionStart
 
-          // 🎯 簡化：只要是用戶行為相關的事件就保留
-          const relevantEvents = controllerEvents.filter(event => {
-            // 排除 AI 系統自己的事件和生命週期事件
-            return !event.includes('AIAgentController') && 
+          // 🎯 更智能的事件分類：區分核心事件和輔助事件
+          const coreEvents = controllerEvents.filter(event => {
+            // 核心事件：直接的用戶行為和重要的 Controller 操作
+            return (
+              // UI 交互事件（用戶直接操作）
+              event.includes('|UI|') ||
+              // Post 相關的重要操作
+              event.includes('PostController') && (
+                event.includes('LOAD_POST') || 
+                event.includes('SEARCH_POSTS') ||
+                event.includes('LOAD_TAGS')
+              ) ||
+              // 交互相關的所有操作（都是用戶主動行為）
+              event.includes('InteractionController') ||
+              // 排除系統內部事件
+              (!event.includes('AIAgentController') && 
+               !event.includes('initialized') && 
+               !event.includes('destroyed') &&
+               !event.includes('Action failed') &&
+               !event.includes('Executing action'))
+            )
+          })
+
+          // 輔助事件：用於豐富上下文，但不計入主要分析
+          const supportingEvents = controllerEvents.filter(event => {
+            return !coreEvents.includes(event) && 
+                   !event.includes('AIAgentController') &&
                    !event.includes('initialized') && 
                    !event.includes('destroyed')
           })
 
-          console.log('🔍 [BehaviorStore] 事件過濾結果:', {
+          const relevantEvents = coreEvents
+
+          console.log('🔍 [BehaviorStore] 智能事件分類結果:', {
             總事件數: controllerEvents.length,
-            相關事件數: relevantEvents.length,
-            過濾比例: `${Math.round((relevantEvents.length / Math.max(controllerEvents.length, 1)) * 100)}%`
+            核心事件數: coreEvents.length,
+            輔助事件數: supportingEvents.length,
+            使用事件數: relevantEvents.length,
+            核心事件比例: `${Math.round((coreEvents.length / Math.max(controllerEvents.length, 1)) * 100)}%`
           })
 
           // 基於相關事件進行模式分析
@@ -185,13 +212,30 @@ export const useBehaviorStore = create<BehaviorStore>()(
           const state = get()
           const userPattern = state.getUserPattern()
 
-          // 同樣在這裡應用事件過濾，確保一致性
-          const relevantEvents = state.controllerEvents.filter(event => {
-            // 排除 AI 系統自己的事件和生命週期事件
-            return !event.includes('AIAgentController') && 
-                   !event.includes('initialized') && 
-                   !event.includes('destroyed')
+          // 同樣在這裡應用智能事件分類，確保一致性
+          const coreEvents = state.controllerEvents.filter(event => {
+            // 使用與 getUserPattern 相同的邏輯
+            return (
+              // UI 交互事件（用戶直接操作）
+              event.includes('|UI|') ||
+              // Post 相關的重要操作
+              event.includes('PostController') && (
+                event.includes('LOAD_POST') || 
+                event.includes('SEARCH_POSTS') ||
+                event.includes('LOAD_TAGS')
+              ) ||
+              // 交互相關的所有操作（都是用戶主動行為）
+              event.includes('InteractionController') ||
+              // 排除系統內部事件
+              (!event.includes('AIAgentController') && 
+               !event.includes('initialized') && 
+               !event.includes('destroyed') &&
+               !event.includes('Action failed') &&
+               !event.includes('Executing action'))
+            )
           })
+
+          const relevantEvents = coreEvents
 
           return {
             recentEvents: [...relevantEvents], // 只返回相關事件
@@ -242,15 +286,30 @@ export const useBehaviorActions = () => useBehaviorStore(state => ({
   clearError: state.clearError
 }))
 
-// 獲取過濾後的相關事件（用於 AI 分析）
+// 獲取過濾後的核心事件（用於 AI 分析）
 export const useRelevantBehaviorEvents = () => useBehaviorStore(state => {
   return state.controllerEvents.filter(event => {
-    return event.includes('PostController') || 
-           event.includes('InteractionController') ||
-           event.includes('MarkdownRenderer') ||
-           (!event.includes('AIAgentController') && 
-            !event.includes('initialized') && 
-            !event.includes('destroyed'))
+    // 使用統一的智能事件分類邏輯
+    return (
+      // UI 交互事件（用戶直接操作）
+      event.includes('|UI|') ||
+      // Post 相關的重要操作
+      event.includes('PostController') && (
+        event.includes('LOAD_POST') || 
+        event.includes('SEARCH_POSTS') ||
+        event.includes('LOAD_TAGS')
+      ) ||
+      // 交互相關的所有操作（都是用戶主動行為）
+      event.includes('InteractionController') ||
+      // 其他有價值的事件（如 MarkdownRenderer）
+      event.includes('MarkdownRenderer') ||
+      // 排除系統內部事件
+      (!event.includes('AIAgentController') && 
+       !event.includes('initialized') && 
+       !event.includes('destroyed') &&
+       !event.includes('Action failed') &&
+       !event.includes('Executing action'))
+    )
   })
 })
 

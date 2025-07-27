@@ -4,7 +4,104 @@
 
 ### 🔥 高優先級
 
-#### 1. Controller Registry 初始化時序問題
+#### 1. AIAgentController 直接調用 AISuggestionController 問題
+**標記:** FIXME  
+**狀態:** 待修復  
+**描述:** AIAgentController 違反 Event-Driven 架構原則，直接調用 ControllerRegistry 執行 AISuggestionController 的 action，破壞了 Controller 間的解耦
+
+**影響範圍:**
+- `src/controllers/AIAgentController.ts:136-153` - 直接調用 `registry.executeAction('AISuggestionController', 'GENERATE_SUGGESTIONS')`
+- 違反了 Event-Driven Action Handler 架構設計原則
+- 阻礙了 Library 化發展和 SuperController 架構準備
+
+**當前 Workaround:**
+```typescript
+// ❌ 當前的直接調用方式 (違反架構原則)
+const registry = ControllerRegistry.getInstance()
+await registry.executeAction('AISuggestionController', 'GENERATE_SUGGESTIONS', {
+    behaviorData,
+    context: {
+        userBehavior: { /* AI 分析結果 */ },
+        aiAnalysis: { /* LLM 洞察 */ }
+    }
+})
+```
+
+**推薦解決方案: Event-Driven 通訊架構**
+
+#### 步驟 1: 修改 AIAgentController 為事件發送
+```typescript
+// ✅ 改為事件驅動方式
+// AIAgentController.ts - analyzeBehaviorAction 方法
+this.emit('aiAnalysisCompleted', {
+    aiInsights,
+    behaviorData,
+    context: {
+        userBehavior: {
+            pattern: behaviorData.userPattern.type,
+            confidence: behaviorData.userPattern.confidence,
+            eventCount: behaviorData.sessionData.eventCount,
+            focusAreas: behaviorData.userPattern.focus_areas
+        },
+        aiAnalysis: {
+            summary: analysisResult,
+            insights: aiInsights,
+            confidence: AIAgentService.isConfigured() ? 'high' : 'medium',
+            source: AIAgentService.isConfigured() ? 'llm' : 'rule_based'
+        }
+    },
+    timestamp: Date.now(),
+    source: AIAgentService.isConfigured() ? 'llm' : 'rule_based'
+})
+```
+
+#### 步驟 2: 修改 AISuggestionController 為事件監聽
+```typescript
+// ✅ 使用 AbstractController 的標準化事件訂閱
+class AISuggestionController extends AbstractController {
+    protected onInitialize(): void {
+        // 使用現有的 subscribeToController 功能
+        this.subscribeToController('AIAgentController', 'aiAnalysisCompleted', this.handleAIAnalysisCompleted.bind(this))
+        this.subscribeToController('AIAgentController', 'aiAnalysisError', this.handleAIAnalysisError.bind(this))
+    }
+    
+    private handleAIAnalysisCompleted(event: AIAnalysisCompletedEvent): void {
+        // 自動觸發建議生成
+        this.executeAction('GENERATE_SUGGESTIONS', {
+            behaviorData: event.behaviorData,
+            context: event.context
+        })
+    }
+    
+    // 無需手動管理事件清理，AbstractController 自動處理
+}
+```
+
+#### 步驟 3: 定義標準化事件類型
+```typescript
+// src/types/controller.ts - 已有基礎，需要具體實現
+interface AIAnalysisCompletedEvent {
+    aiInsights: any
+    behaviorData: BehaviorData
+    context: SuggestionContext
+    timestamp: number
+    source: 'llm' | 'rule_based'
+}
+```
+
+**架構優勢:**
+- ✅ **恢復解耦**: Controller 間無直接依賴，符合 Event-Driven 原則
+- ✅ **職責純化**: AIAgent 專注 LLM 通訊，AISuggestion 專注建議策略
+- ✅ **利用現有基礎**: AbstractController 已提供完整的跨 Controller 事件訂閱功能
+- ✅ **SuperController 準備**: 為統一 AI Agent 調度奠定基礎
+
+**預計工作量:** 2-3 小時  
+**風險評估:** 低 - AbstractController 基礎設施已完備，只需修改業務邏輯  
+**優先級理由:** 阻礙架構發展，影響 Library 化進程
+
+---
+
+#### 2. Controller Registry 初始化時序問題
 **標記:** FIXME  
 **狀態:** 待修復  
 **描述:** Registry 應該在所有組件掛載前完成初始化，目前使用 polling workaround
@@ -250,14 +347,15 @@ class SelectionAwareSuggestionGenerator {
 ## 📈 技術債務指標
 
 ### 當前狀況
-- **總 FIXME:** 3 個
+- **總 FIXME:** 4 個
 - **總 TODO:** 6 個  
 - **總 HACK:** 0 個
-- **高優先級債務:** 1 個
+- **高優先級債務:** 2 個
 - **中優先級債務:** 2 個
 
 ### 目標
-- **下週目標:** 解決高優先級時序問題
+- **下週目標:** 解決 AIAgentController 直接調用問題 (高優先級)
+- **雙週目標:** 解決 Controller Registry 初始化時序問題 (高優先級)
 - **月度目標:** 清理所有 TODO 標記
 - **長期目標:** 保持零 HACK 標記
 
