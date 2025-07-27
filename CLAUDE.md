@@ -98,11 +98,16 @@ doc/
 - **Real Feedback**: Don't just say "great idea" - provide substantive analysis
 - **Question Everything**: Ask "is this really necessary?" or "what are the trade-offs?"
 - **Architecture Skepticism**: Be especially critical of complex solutions - prefer simple over clever
+- **Problem Analysis**: When user reports issues, analyze the root cause before proposing solutions
+- **Challenge User Assumptions**: Don't automatically agree - question if the perceived problem is real
 - **Examples of Critical Questions**:
   - "This adds complexity - is the benefit worth it?"
   - "Have we considered simpler alternatives?"
   - "What happens if this approach fails?"
   - "Are we over-engineering this problem?"
+  - "Is this actually a problem or just a perceived issue?"
+  - "What's the real impact of this issue?"
+  - "Are we solving the right problem?"
 
 ### TypeScript Rules (from .cursor rules):
 - Prefer `type` over `interface`

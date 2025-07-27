@@ -49,4 +49,49 @@ export class ControllerError extends Error {
         super(message)
         this.name = 'ControllerError'
     }
+}
+
+/**
+ * AI 分析完成事件數據
+ */
+export interface AIAnalysisCompletedEvent {
+    aiInsights: {
+        suggestedActions: string[]
+        userMood: string
+        confidenceLevel: number
+        recommendations: string[]
+    } | null
+    behaviorData: any // 從 BehaviorStore 來的數據
+    context: {
+        currentPost?: { id: string }
+        currentSelection?: {
+            sectionId: string
+            selectedText: string
+        }
+        userBehavior: {
+            pattern: string
+            confidence: number
+            eventCount: number
+            focusAreas: string[]
+        }
+        aiAnalysis?: {
+            summary: string
+            source: 'llm' | 'rule_based'
+            confidence: 'high' | 'medium' | 'low'
+        }
+    }
+    timestamp: number
+    source: 'llm' | 'rule_based'
+    confidence: number
+}
+
+/**
+ * AI 分析錯誤事件數據
+ */
+export interface AIAnalysisErrorEvent {
+    error: string
+    behaviorData: any
+    context: any
+    timestamp: number
+    fallbackStrategy: 'mock_analysis' | 'skip_suggestions' | 'retry'
 } 

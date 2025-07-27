@@ -1,115 +1,60 @@
 # 📋 專案功能規格文檔
 
-> 本目錄包含所有功能需求、業務邏輯和使用者故事的詳細規格文檔。
+> 簡化的功能規格文檔，專注於核心功能特性和發展方向。技術實作細節請參考 [開發文檔](../dev/README.md)。
 
-## 🎯 文檔結構概覽
+## 🎯 文檔結構
 
-### 📄 **核心功能規格**
-- **[features.md](./features.md)** - 專案整體功能清單和開發狀態
-- **[ai-behavior-system.md](./ai-behavior-system.md)** - AI 行為助手系統設計和現狀
-- **[ai-behavior-roadmap.md](./ai-behavior-roadmap.md)** - AI 行為系統實施路線圖
+### 📱 **專案功能規格**  
+- **[project-features.md](./project-features.md)** - 完整的功能規格和互動系統
 
-### 📁 **功能模組規格**
+### 🤖 **AI 智能系統**
+- **[ai-intelligence-system.md](./ai-intelligence-system.md)** - 行為分析與智能建議系統
 
-#### 🔖 **文章系統** (`/post/`)
-- **[README.md](./post/README.md)** - 文章系統功能概覽
-- **[api.md](./post/api.md)** - 文章 API 規格
-- **[post-interaction-system.md](./post/post-interaction-system.md)** - 文章互動系統規格
-
-#### 🔌 **整合系統** (`/integration/`)
-- **[README.md](./integration/README.md)** - 系統整合規格
-
-#### 🎨 **UI 規格** (`/ui/`)
-- **[README.md](./ui/README.md)** - UI/UX 設計規格
-
-#### 🎪 **策略系統** (`/strategy/`)
-- **[README.md](./strategy/README.md)** - 策略模式實作規格
+### 🚀 **Library 化發展**
+- **[library-development.md](./library-development.md)** - AI-First Behavior Intelligence Library 發展規劃
 
 ## 📊 **功能開發狀態**
 
-| 功能模組 | 開發狀態 | 完成度 | 備註 |
-|---------|---------|--------|------|
-| 文章系統 | ✅ 完成 | 100% | 核心功能已實作 |
-| 互動系統 | ✅ 完成 | 100% | 評論、高亮、筆記等功能 |
-| 行為追蹤 | ✅ 完成 | 100% | BehaviorStore + EventCollector |
-| **AI 行為分析** | 🎉 **完成** | **100%** | **重構完成，職責分離優化** |
-| **AI 建議系統** | 🎉 **完成** | **100%** | **智能建議生成 + 隊列管理** |
-| **AI Toast UI** | ✅ **完成** | **100%** | **建議顯示和用戶交互** |
-| **隊列優化** | ✅ **完成** | **100%** | **IntervalManager 智能優化** |
-| **Registry通訊** | ✅ **完成** | **100%** | **Controller間安全通訊** |
-| 整合系統 | 📋 規劃中 | 0% | 待開發 |
-| UI 系統 | 📋 規劃中 | 0% | 待開發 |
-| 策略系統 | 📋 規劃中 | 0% | 待開發 |
+| 功能模組 | 開發狀態 | 備註 |
+|---------|---------|------|
+| 文章系統 | ✅ 完成 | MDX 渲染、互動功能 |
+| 行為追蹤 | ✅ 完成 | BehaviorStore + EventCollector |
+| AI 智能系統 | ⚠️ 待重構 | 行為分析、建議生成、Toast UI (有架構債務) |
+| Controller 架構 | ✅ 完成 | Event-Driven Action Handler 系統 |
+| Library 化發展 | 🚀 進行中 | AI-First Behavior Intelligence Library |
 
-## 🔍 **如何使用本文檔**
+## 🔍 **如何使用文檔**
 
 ### **產品經理 / 專案經理**
-- 從 `features.md` 開始了解專案整體功能
-- 查看各模組的 README 了解具體需求
-- 追蹤開發狀態和優先級
+- **[project-features.md](./project-features.md)** - 掌握所有功能規格和開發狀態
+- **[ai-intelligence-system.md](./ai-intelligence-system.md)** - 理解 AI 智能系統的商業價值
+- **[library-development.md](./library-development.md)** - 了解 Library 化發展策略
 
 ### **開發人員**
-- 查看具體模組的詳細規格
-- 了解 API 設計和資料結構
-- 確認業務邏輯和使用者流程
+- **[project-features.md](./project-features.md)** - 查看完整的功能架構
+- **[ai-intelligence-system.md](./ai-intelligence-system.md)** - 了解 AI 系統實現邏輯
+- **[../dev/](../dev/)** - 技術實作細節和 API 設計
 
-### **測試人員**
-- 參考功能規格撰寫測試案例
-- 了解使用者故事和驗收標準
-- 確認系統整合點和邊界條件
-
-### **設計師**
-- 查看 UI 規格了解設計需求
-- 了解使用者互動流程
-- 確認介面元素和狀態
-
-## 📝 **規格文檔規範**
-
-### **功能規格格式**
-```markdown
-# 功能名稱
-
-## 功能描述
-- 功能目的和價值
-- 使用者故事
-
-## 需求規格
-- 功能需求
-- 非功能需求
-
-## 驗收標準
-- 測試案例
-- 效能指標
-
-## 相關文檔
-- 技術設計文檔
-- API 規格
-```
-
-### **文檔維護原則**
-1. **及時更新** - 功能變更時同步更新文檔
-2. **清楚描述** - 使用明確的語言描述需求
-3. **結構化** - 遵循統一的文檔結構
-4. **可追溯** - 需求與實作之間可追溯
+### **架構師**
+- **[library-development.md](./library-development.md)** - Library 架構設計和抽象策略
+- **[ai-intelligence-system.md](./ai-intelligence-system.md)** - AI-First 架構設計理念
+- **[../dev/architecture.md](../dev/architecture.md)** - 詳細技術架構
 
 ## 🔗 **相關文檔**
 
-### **技術文檔**
-- [開發文檔](../dev/README.md) - 技術架構和開發指南
-- [架構設計](../dev/architecture.md) - 系統架構詳解
-- [AI Agent 指南](../dev/ai-agent-guide.md) - AI 代理實作指南
-
-### **專案文檔**
+### **技術實作**
+- [開發文檔](../dev/README.md) - 技術架構和實作指南
 - [CLAUDE.md](../../CLAUDE.md) - 專案總覽和開發指令
-- [專案結構](../dev/project-structure.md) - 程式碼組織結構
 
-## 📞 **聯絡資訊**
+### **技術規格** (已移至 dev/)
+- [文章系統技術規格](../dev/post/) - MDX 處理和互動系統實作
+- [AI 系統技術規格](../dev/integration/) - Controller 整合和測試策略
+- [UI 組件技術規格](../dev/ui/) - Toast 和介面實作細節
+- [策略系統技術規格](../dev/strategy/) - 建議策略和 LLM 整合
 
-如有任何功能需求或規格相關問題，請：
-1. 檢查現有文檔是否已涵蓋
-2. 在相關 Issue 中提出討論
-3. 更新對應的規格文檔
+### **技術債務管理**
+- [技術債務清單](./technical-debt.md) - 當前技術債務、修復計劃和優先級管理
 
 ---
 
-💡 **提醒**: 本文檔著重於「做什麼」的功能規格，技術實作請參考 [開發文檔](../dev/README.md)。
+**文檔結構優化**: 分離功能規格與技術實作，spec/ 專注功能特性，dev/ 專注技術細節。
